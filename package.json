@@ -1,0 +1,11 @@
+{
+  "name": "jpgconvert",
+  "version": "1.0.0",
+  "description": "JPG.convert — conversor de imagens com Mercado Pago",
+  "scripts": {
+    "dev": "netlify dev"
+  },
+  "dependencies": {
+    "mercadopago": "^2.0.15"
+  }
+}

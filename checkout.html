@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Checkout — JPG.convert</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+
+  <!-- ══════════════════ MERCADO PAGO SDK ══════════════════ -->
+  <!-- Documentação: https://www.mercadopago.com.br/developers/pt/docs/checkout-bricks/payment-brick/introduction -->
+  <script src="https://sdk.mercadopago.com/js/v2"></script>
+
+  <style>
+    /* ── Reset & Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:       #080811;
+      --bg2:      #0d0d1a;
+      --bg3:      #111120;
+      --border:   rgba(255,255,255,0.06);
+      --text:     #f1f1f7;
+      --muted:    rgba(255,255,255,0.45);
+      --muted2:   rgba(255,255,255,0.65);
+      --purple:   #8b5cf6;
+      --purple-lt:#a78bfa;
+      --cyan:     #22d3ee;
+      --green:    #10b981;
+      --amber:    #fbbf24;
+      --red:      #f87171;
+      --glow:     0 0 40px rgba(139,92,246,0.18);
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      background-image: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(139,92,246,0.12), transparent);
+    }
+    a { color: inherit; text-decoration: none; }
+
+    /* ── Nav ── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(8,8,17,0.85);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px; height: 60px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-logo { display: flex; align-items: center; gap: 10px; }
+    .logo-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: linear-gradient(135deg, var(--purple), #6d28d9);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px;
+    }
+    .logo-text { font-size: 16px; font-weight: 800; }
+    .logo-text span { color: var(--purple-lt); }
+    .nav-step {
+      font-size: 13px; color: var(--muted2); font-weight: 600;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .nav-step-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+    .nav-secure {
+      font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px;
+    }
+
+    /* ── Main layout ── */
+    main {
+      max-width: 1080px; margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+    .page-title {
+      font-size: 26px; font-weight: 800; margin-bottom: 32px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .page-title .plan-badge {
+      font-size: 12px; font-weight: 800; padding: 4px 12px; border-radius: 20px;
+    }
+    .badge-basico  { background: rgba(255,255,255,0.08); color: var(--muted2); }
+    .badge-pro     { background: rgba(139,92,246,0.2);   color: var(--purple-lt); }
+    .badge-ilimitado { background: rgba(34,211,238,0.15); color: var(--cyan); }
+
+    .checkout-grid {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 28px;
+      align-items: flex-start;
+    }
+
+    /* ── Sections ── */
+    .checkout-section {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .section-title {
+      font-size: 15px; font-weight: 800; margin-bottom: 20px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .section-number {
+      width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+      background: rgba(139,92,246,0.2); color: var(--purple-lt);
+      font-size: 12px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .section-number.done { background: rgba(16,185,129,0.2); color: var(--green); }
+
+    /* ── Form ── */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .form-grid.full { grid-template-columns: 1fr; }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field label {
+      font-size: 12px; font-weight: 700; color: var(--muted2);
+      letter-spacing: 0.3px; text-transform: uppercase;
+    }
+    .field input, .field select {
+      background: var(--bg3); border: 1px solid var(--border);
+      color: var(--text); font-family: inherit; font-size: 14px;
+      padding: 12px 14px; border-radius: 10px; outline: none;
+      transition: border-color .15s;
+    }
+    .field input:focus, .field select:focus { border-color: var(--purple); }
+    .field input::placeholder { color: var(--muted); }
+    .field input.error { border-color: var(--red); }
+    .field-hint { font-size: 11px; color: var(--muted); margin-top: 3px; }
+    .field-error { font-size: 11px; color: var(--red); margin-top: 3px; display: none; }
+    .field.has-error .field-error { display: block; }
+    .field.has-error input { border-color: var(--red); }
+
+    /* ── Payment tabs ── */
+    .payment-tabs {
+      display: flex; gap: 8px; margin-bottom: 20px;
+    }
+    .pay-tab {
+      flex: 1; padding: 12px 8px;
+      background: var(--bg3); border: 1.5px solid var(--border);
+      border-radius: 10px; cursor: pointer;
+      font-family: inherit; font-size: 13px; font-weight: 700;
+      color: var(--muted2); text-align: center;
+      transition: border-color .15s, color .15s, background .15s;
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+    }
+    .pay-tab .tab-icon { font-size: 20px; }
+    .pay-tab:hover { border-color: rgba(139,92,246,0.4); color: var(--text); }
+    .pay-tab.active {
+      border-color: var(--purple); color: var(--text);
+      background: rgba(139,92,246,0.07);
+    }
+    .pay-tab.active-pix   { border-color: var(--green);  background: rgba(16,185,129,0.07); }
+    .pay-tab.active-card  { border-color: var(--purple); background: rgba(139,92,246,0.07); }
+    .pay-tab.active-boleto{ border-color: var(--amber);  background: rgba(251,191,36,0.06); }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── PIX panel ── */
+    .pix-panel {
+      text-align: center; padding: 8px 0;
+    }
+    .pix-highlight {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25);
+      border-radius: 10px; padding: 10px 18px;
+      font-size: 13px; font-weight: 700; color: var(--green);
+      margin-bottom: 20px;
+    }
+    .pix-steps { text-align: left; display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+    .pix-step {
+      display: flex; align-items: flex-start; gap: 12px;
+      font-size: 13px; color: var(--muted2);
+    }
+    .pix-step-n {
+      width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+      background: rgba(16,185,129,0.15); color: var(--green);
+      font-size: 11px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center; margin-top: 1px;
+    }
+    .pix-qr-zone {
+      display: none; /* mostrado após criar pagamento no backend */
+      flex-direction: column; align-items: center; gap: 16px;
+      padding: 24px; background: var(--bg3); border-radius: 12px;
+      border: 1px solid rgba(16,185,129,0.2);
+    }
+    .pix-qr-zone.visible { display: flex; }
+    .pix-qr-img {
+      width: 200px; height: 200px; border-radius: 12px;
+      background: #fff; display: flex; align-items: center; justify-content: center;
+      font-size: 12px; color: #333;
+    }
+    .pix-copy-code {
+      width: 100%; padding: 10px 14px;
+      background: var(--bg2); border: 1px solid var(--border);
+      color: var(--text); border-radius: 8px; font-size: 11px;
+      font-family: monospace; word-break: break-all; cursor: pointer;
+      transition: border-color .15s;
+    }
+    .pix-copy-code:hover { border-color: var(--green); }
+    .pix-timer { font-size: 12px; color: var(--muted); }
+    .pix-timer span { color: var(--amber); font-weight: 800; font-variant-numeric: tabular-nums; }
+
+    /* ── Card (Mercado Pago Brick) ── */
+    .mp-brick-wrapper {
+      border-radius: 12px; overflow: hidden;
+      /* O SDK do MP injeta um iframe/div aqui */
+    }
+    #paymentBrick_container {
+      min-height: 200px;
+    }
+    .mp-loading {
+      display: flex; align-items: center; justify-content: center;
+      gap: 10px; padding: 32px; color: var(--muted2); font-size: 14px;
+    }
+    .mp-loading-spin {
+      width: 20px; height: 20px; border-radius: 50%;
+      border: 2px solid rgba(139,92,246,0.3);
+      border-top-color: var(--purple);
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Boleto panel ── */
+    .boleto-info {
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .boleto-notice {
+      background: rgba(251,191,36,0.07); border: 1px solid rgba(251,191,36,0.2);
+      border-radius: 10px; padding: 14px; font-size: 13px; color: var(--muted2);
+      display: flex; gap: 10px;
+    }
+    .boleto-notice strong { color: var(--amber); }
+
+    /* ── Botão principal de pagamento ── */
+    .btn-pay {
+      width: 100%; padding: 16px 24px;
+      background: linear-gradient(135deg, var(--purple), #6d28d9);
+      color: #fff; font-family: inherit; font-size: 16px; font-weight: 800;
+      border: none; border-radius: 12px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      transition: opacity .15s, transform .1s, box-shadow .2s;
+      box-shadow: 0 4px 20px rgba(139,92,246,0.35);
+      letter-spacing: 0.2px;
+    }
+    .btn-pay:hover { opacity: .92; transform: translateY(-1px); box-shadow: 0 6px 28px rgba(139,92,246,0.45); }
+    .btn-pay:active { transform: translateY(0); }
+    .btn-pay:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+    .btn-pay.pix  { background: linear-gradient(135deg, #059669, #10b981); box-shadow: 0 4px 20px rgba(16,185,129,0.3); }
+    .btn-pay.boleto { background: linear-gradient(135deg, #b45309, #f59e0b); box-shadow: 0 4px 20px rgba(245,158,11,0.25); }
+    .btn-pay-sub { font-size: 11px; font-weight: 500; opacity: .7; display: block; text-align: center; margin-top: 10px; color: var(--muted); }
+
+    /* ── Order summary (direita) ── */
+    .order-summary {
+      position: sticky; top: 80px;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 16px; overflow: hidden;
+    }
+    .summary-header {
+      padding: 20px 22px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .summary-header h3 { font-size: 14px; font-weight: 800; color: var(--muted2); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 16px; }
+    .summary-plan-name { font-size: 22px; font-weight: 900; margin-bottom: 4px; }
+    .summary-price-row { display: flex; align-items: baseline; gap: 4px; margin-bottom: 4px; }
+    .summary-currency { font-size: 16px; font-weight: 700; color: var(--muted2); }
+    .summary-amount   { font-size: 36px; font-weight: 900; line-height: 1; }
+    .summary-period   { font-size: 13px; color: var(--muted); }
+    .summary-promo    { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .summary-promo s  { opacity: .5; }
+    .summary-promo strong { color: var(--cyan); }
+
+    .summary-features { padding: 16px 22px; border-bottom: 1px solid var(--border); }
+    .summary-feat {
+      display: flex; align-items: flex-start; gap: 8px;
+      font-size: 13px; color: var(--muted2); margin-bottom: 10px;
+    }
+    .summary-feat:last-child { margin-bottom: 0; }
+    .summary-feat .ico { color: var(--green); flex-shrink: 0; font-style: normal; }
+
+    .summary-total { padding: 16px 22px; border-bottom: 1px solid var(--border); }
+    .total-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--muted2); margin-bottom: 8px; }
+    .total-row.main { font-size: 16px; font-weight: 800; color: var(--text); margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+    .total-row.main span:last-child { color: var(--purple-lt); }
+
+    .summary-security { padding: 16px 22px; }
+    .security-badge {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12px; color: var(--muted); margin-bottom: 8px;
+    }
+    .security-badge:last-child { margin-bottom: 0; }
+    .security-badge .ico { font-size: 15px; flex-shrink: 0; }
+    .mp-logo-badge {
+      margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted);
+    }
+    .mp-logo {
+      background: #009ee3; color: #fff; font-size: 10px; font-weight: 800;
+      padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+    }
+
+    /* ── Overlay de loading ── */
+    .loading-overlay {
+      display: none; position: fixed; inset: 0; z-index: 500;
+      background: rgba(4,4,12,0.88); backdrop-filter: blur(8px);
+      align-items: center; justify-content: center; flex-direction: column; gap: 20px;
+    }
+    .loading-overlay.visible { display: flex; }
+    .loading-spinner {
+      width: 52px; height: 52px; border-radius: 50%;
+      border: 3px solid rgba(139,92,246,0.2);
+      border-top-color: var(--purple);
+      animation: spin .9s linear infinite;
+    }
+    .loading-text { font-size: 15px; font-weight: 700; color: var(--muted2); }
+
+    /* ── Modal de sucesso ── */
+    .success-modal {
+      display: none; position: fixed; inset: 0; z-index: 600;
+      background: rgba(4,4,12,0.92); backdrop-filter: blur(16px);
+      align-items: center; justify-content: center; padding: 24px;
+    }
+    .success-modal.visible { display: flex; }
+    .success-box {
+      background: var(--bg2); border: 1px solid rgba(16,185,129,0.3);
+      border-radius: 20px; padding: 40px 36px; text-align: center;
+      max-width: 460px; width: 100%;
+      box-shadow: 0 0 60px rgba(16,185,129,0.15);
+    }
+    .success-icon {
+      width: 72px; height: 72px; border-radius: 50%; margin: 0 auto 20px;
+      background: rgba(16,185,129,0.15); border: 2px solid rgba(16,185,129,0.35);
+      display: flex; align-items: center; justify-content: center; font-size: 32px;
+    }
+    .success-box h2 { font-size: 24px; font-weight: 900; margin-bottom: 10px; }
+    .success-box p  { font-size: 14px; color: var(--muted2); line-height: 1.6; margin-bottom: 24px; }
+    .success-detail {
+      background: var(--bg3); border-radius: 10px; padding: 14px 18px;
+      font-size: 13px; color: var(--muted2); text-align: left; margin-bottom: 24px;
+    }
+    .success-detail strong { color: var(--text); }
+    .btn-success {
+      width: 100%; padding: 14px;
+      background: var(--green); color: #fff; font-weight: 800; font-size: 15px;
+      border: none; border-radius: 10px; cursor: pointer;
+      transition: opacity .15s;
+    }
+    .btn-success:hover { opacity: .88; }
+
+    /* ── Toast ── */
+    #toasts { position: fixed; bottom: 24px; right: 24px; z-index: 999; display: flex; flex-direction: column; gap: 8px; }
+    .toast {
+      padding: 12px 18px; border-radius: 10px; font-size: 13px; font-weight: 600;
+      background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+      animation: slideIn .25s ease; box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+      max-width: 320px;
+    }
+    .toast.ok  { border-color: rgba(16,185,129,0.4); color: var(--green); }
+    .toast.err { border-color: rgba(248,113,113,0.4); color: var(--red); }
+    @keyframes slideIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:none; } }
+
+    /* ── Responsive ── */
+    @media (max-width: 780px) {
+      .checkout-grid { grid-template-columns: 1fr; }
+      .order-summary { position: static; order: -1; }
+      .form-grid { grid-template-columns: 1fr; }
+      .page-title { font-size: 20px; }
+      main { padding: 24px 16px 60px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════════ NAV ════════════════════ -->
+<nav>
+  <a href="conversor-jpg.html" class="nav-logo">
+    <div class="logo-icon">🖼️</div>
+    <span class="logo-text">JPG<span>.convert</span></span>
+  </a>
+  <div class="nav-step">
+    <div class="nav-step-dot"></div>
+    Checkout seguro
+  </div>
+  <div class="nav-secure">🔒 Pagamento protegido pelo Mercado Pago</div>
+</nav>
+
+<!-- ════════════════════ MAIN ════════════════════ -->
+<main>
+  <div class="page-title">
+    Finalizar assinatura
+    <span class="plan-badge" id="pagePlanBadge">Pro</span>
+  </div>
+
+  <div class="checkout-grid">
+
+    <!-- ──────────── ESQUERDA: formulário ──────────── -->
+    <div class="checkout-left">
+
+      <!-- SEÇÃO 1: Dados pessoais -->
+      <div class="checkout-section">
+        <div class="section-title">
+          <div class="section-number" id="step1num">1</div>
+          Seus dados
+        </div>
+        <form id="customerForm" autocomplete="on" novalidate>
+          <div class="form-grid">
+            <div class="field" id="field-name">
+              <label for="fname">Nome completo</label>
+              <input id="fname" name="name" type="text" placeholder="João Silva" autocomplete="name"/>
+              <span class="field-error">Informe seu nome completo.</span>
+            </div>
+            <div class="field" id="field-email">
+              <label for="femail">E-mail</label>
+              <input id="femail" name="email" type="email" placeholder="joao@email.com" autocomplete="email"/>
+              <span class="field-error">E-mail inválido.</span>
+            </div>
+            <div class="field" id="field-cpf">
+              <label for="fcpf">CPF</label>
+              <input id="fcpf" name="cpf" type="text" placeholder="000.000.000-00" maxlength="14" inputmode="numeric"/>
+              <span class="field-error">CPF inválido.</span>
+            </div>
+            <div class="field" id="field-phone">
+              <label for="fphone">Celular <span style="color:var(--muted);font-weight:400">(opcional)</span></label>
+              <input id="fphone" name="phone" type="tel" placeholder="(11) 99999-0000" maxlength="15" inputmode="numeric" autocomplete="tel"/>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!-- SEÇÃO 2: Forma de pagamento -->
+      <div class="checkout-section">
+        <div class="section-title">
+          <div class="section-number" id="step2num">2</div>
+          Forma de pagamento
+        </div>
+
+        <div class="payment-tabs">
+          <button class="pay-tab active active-pix" onclick="selectTab('pix')" id="tab-btn-pix">
+            <span class="tab-icon">⚡</span>
+            PIX
+          </button>
+          <button class="pay-tab" onclick="selectTab('card')" id="tab-btn-card">
+            <span class="tab-icon">💳</span>
+            Cartão
+          </button>
+          <button class="pay-tab" onclick="selectTab('boleto')" id="tab-btn-boleto">
+            <span class="tab-icon">📄</span>
+            Boleto
+          </button>
+        </div>
+
+        <!-- PIX -->
+        <div class="tab-panel active" id="panel-pix">
+          <div class="pix-panel">
+            <div class="pix-highlight">⚡ Aprovação em segundos • Sem taxas extras</div>
+            <div class="pix-steps">
+              <div class="pix-step"><div class="pix-step-n">1</div><span>Clique em "Pagar com PIX" abaixo</span></div>
+              <div class="pix-step"><div class="pix-step-n">2</div><span>Um QR Code será gerado para você escanear</span></div>
+              <div class="pix-step"><div class="pix-step-n">3</div><span>Abra seu banco, escaneie o QR e confirme o pagamento</span></div>
+              <div class="pix-step"><div class="pix-step-n">4</div><span>Seu plano é ativado automaticamente após a confirmação</span></div>
+            </div>
+
+            <!-- QR Code (exibido após criar o pagamento no backend) -->
+            <div class="pix-qr-zone" id="pixQrZone">
+              <div class="pix-qr-img" id="pixQrImg">QR Code aqui</div>
+              <p style="font-size:13px;color:var(--muted2);">Ou copie o código abaixo:</p>
+              <input class="pix-copy-code" id="pixCopyCode" readonly onclick="copyPixCode()" value=""/>
+              <button onclick="copyPixCode()" style="background:none;border:none;color:var(--green);font-size:13px;font-weight:700;cursor:pointer;">📋 Copiar código PIX</button>
+              <div class="pix-timer">Expira em: <span id="pixCountdown">30:00</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cartão (Mercado Pago Payment Brick) -->
+        <div class="tab-panel" id="panel-card">
+          <div class="mp-brick-wrapper">
+            <div id="paymentBrick_container">
+              <div class="mp-loading">
+                <div class="mp-loading-spin"></div>
+                Carregando formulário de pagamento…
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Boleto -->
+        <div class="tab-panel" id="panel-boleto">
+          <div class="boleto-info">
+            <div class="boleto-notice">
+              ⚠️ <div>
+                <strong>Prazo de compensação:</strong> boletos levam até <strong>3 dias úteis</strong> para compensar.
+                Seu plano é ativado após a confirmação do pagamento.
+              </div>
+            </div>
+            <div class="pix-steps">
+              <div class="pix-step"><div class="pix-step-n" style="background:rgba(251,191,36,0.15);color:var(--amber)">1</div><span>Clique em "Gerar boleto" e preencha seus dados</span></div>
+              <div class="pix-step"><div class="pix-step-n" style="background:rgba(251,191,36,0.15);color:var(--amber)">2</div><span>Pague em qualquer banco, lotérica ou app</span></div>
+              <div class="pix-step"><div class="pix-step-n" style="background:rgba(251,191,36,0.15);color:var(--amber)">3</div><span>Aguarde até 3 dias úteis para ativação</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SEÇÃO 3: Botão de pagamento -->
+      <button class="btn-pay pix" id="btnPay" onclick="processPayment()">
+        <span id="btnPayIcon">⚡</span>
+        <span id="btnPayText">Pagar com PIX</span>
+      </button>
+      <span class="btn-pay-sub" id="btnPaySub">Pagamento processado com segurança pelo Mercado Pago</span>
+    </div><!-- /checkout-left -->
+
+    <!-- ──────────── DIREITA: resumo do pedido ──────────── -->
+    <div class="order-summary">
+
+      <div class="summary-header">
+        <h3>Resumo do pedido</h3>
+        <div class="summary-plan-name" id="sumPlanName">Pro</div>
+        <div class="summary-price-row">
+          <span class="summary-currency">R$</span>
+          <span class="summary-amount" id="sumAmount">19</span>
+          <span style="font-size:20px;font-weight:700;align-self:flex-end;padding-bottom:3px" id="sumCents">,90</span>
+        </div>
+        <div class="summary-period">por mês · cobrado mensalmente</div>
+        <div class="summary-promo" id="sumPromo" style="display:none">
+          De <s id="sumOldPrice"></s> → <strong id="sumNewPrice"></strong>
+        </div>
+      </div>
+
+      <div class="summary-features" id="sumFeatures">
+        <!-- preenchido via JS -->
+      </div>
+
+      <div class="summary-total">
+        <div class="total-row">
+          <span>Subtotal</span>
+          <span id="totSubtotal">R$19,90</span>
+        </div>
+        <div class="total-row">
+          <span>Desconto</span>
+          <span style="color:var(--green)" id="totDiscount">—</span>
+        </div>
+        <div class="total-row main">
+          <span>Total hoje</span>
+          <span id="totTotal">R$19,90</span>
+        </div>
+      </div>
+
+      <div class="summary-security">
+        <div class="security-badge"><span class="ico">🔒</span> Conexão SSL 256-bit criptografada</div>
+        <div class="security-badge"><span class="ico">🛡️</span> Dados protegidos pelo Mercado Pago</div>
+        <div class="security-badge"><span class="ico">🔄</span> Cancele quando quiser, sem multa</div>
+        <div class="security-badge"><span class="ico">💬</span> Suporte em caso de problemas</div>
+        <div class="mp-logo-badge">
+          <span>Pagamento processado por</span>
+          <span class="mp-logo">Mercado Pago</span>
+        </div>
+      </div>
+
+    </div><!-- /order-summary -->
+
+  </div><!-- /checkout-grid -->
+</main>
+
+<!-- ════════════════════ LOADING ════════════════════ -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loadingText">Processando pagamento…</div>
+</div>
+
+<!-- ════════════════════ MODAL SUCESSO ════════════════════ -->
+<div class="success-modal" id="successModal">
+  <div class="success-box">
+    <div class="success-icon">✓</div>
+    <h2>Pagamento confirmado!</h2>
+    <p>Seu plano foi ativado com sucesso. Você já pode usar todos os recursos desbloqueados.</p>
+    <div class="success-detail">
+      <strong>Plano:</strong> <span id="sucPlan">Pro</span><br/>
+      <strong>E-mail:</strong> <span id="sucEmail">—</span><br/>
+      <strong>Próxima cobrança:</strong> <span id="sucNextCharge">—</span>
+    </div>
+    <button class="btn-success" onclick="goToConverter()">Começar a usar →</button>
+  </div>
+</div>
+
+<!-- ════════════════════ TOASTS ════════════════════ -->
+<div id="toasts"></div>
+
+<!-- ════════════════════ JAVASCRIPT ════════════════════ -->
+<script>
+/* ══════════════════════════════════════════════════════════════
+   CONFIGURAÇÃO — preencha antes de ir para produção
+   ══════════════════════════════════════════════════════════════ */
+
+/**
+ * ⚠️ SUBSTITUA pela sua chave pública do Mercado Pago.
+ * Obtenha em: https://www.mercadopago.com.br/developers/pt/docs/getting-started
+ * Use TEST-xxx... para testes e APP_USR-xxx... para produção.
+ */
+const MP_PUBLIC_KEY = 'TEST-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx';
+
+/**
+ * URL da API — usa caminho relativo para funcionar com Netlify Functions.
+ * Em produção: /api/* → /.netlify/functions/* (configurado em netlify.toml)
+ */
+const API_BASE_URL = '/api';
+
+/* ══════════════════════════════════════════════════════════════
+   DADOS DOS PLANOS
+   ══════════════════════════════════════════════════════════════ */
+const PLANS = {
+  basico: {
+    name:     'Básico',
+    amount:   9.90,
+    currency: 'BRL',
+    color:    'var(--muted2)',
+    badgeClass: 'badge-basico',
+    promo:    null,
+    features: [
+      '60 conversões/mês',
+      'Até 20 fotos por vez',
+      'Arquivos até 20 MB',
+      'Download em ZIP',
+    ],
+  },
+  pro: {
+    name:     'Pro',
+    amount:   19.90,
+    currency: 'BRL',
+    color:    'var(--purple-lt)',
+    badgeClass: 'badge-pro',
+    promo:    null,
+    features: [
+      '300 conversões/mês',
+      'Até 30 fotos por vez',
+      'Arquivos até 100 MB',
+      'Download em ZIP',
+      'Qualidade personalizada',
+      'Processamento prioritário',
+    ],
+  },
+  ilimitado: {
+    name:     'Ilimitado',
+    amount:   24.90,
+    currency: 'BRL',
+    color:    'var(--cyan)',
+    badgeClass: 'badge-ilimitado',
+    promo:    { oldPrice: 'R$49,90', newPrice: 'R$24,90 — 50% OFF' },
+    features: [
+      'Conversões ILIMITADAS ♾️',
+      'Até 50 fotos por vez',
+      'Sem limite de tamanho',
+      'Download em ZIP',
+      'Qualidade máxima (100%)',
+      'Processamento prioritário',
+      'Histórico de conversões',
+      'Suporte prioritário 24/7',
+    ],
+  },
+};
+
+/* ══════════════════════════════════════════════════════════════
+   INICIALIZAÇÃO DA PÁGINA
+   ══════════════════════════════════════════════════════════════ */
+const params   = new URLSearchParams(window.location.search);
+const planKey  = (params.get('plan') || 'pro').toLowerCase();
+const plan     = PLANS[planKey] || PLANS.pro;
+
+let currentTab = 'pix';
+let brickController = null;
+let pixCountdownInterval = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  applyPlanToPage();
+  initMercadoPago();
+  initMasks();
+});
+
+function applyPlanToPage() {
+  // Badge no título
+  const badge = document.getElementById('pagePlanBadge');
+  badge.textContent = plan.name;
+  badge.className = 'plan-badge ' + plan.badgeClass;
+
+  // Resumo
+  document.getElementById('sumPlanName').textContent = plan.name;
+  document.getElementById('sumPlanName').style.color = plan.color;
+  const [int, dec] = plan.amount.toFixed(2).split('.');
+  document.getElementById('sumAmount').textContent = int;
+  document.getElementById('sumCents').textContent  = ',' + dec;
+
+  // Promoção
+  if (plan.promo) {
+    document.getElementById('sumPromo').style.display = 'block';
+    document.getElementById('sumOldPrice').textContent = plan.promo.oldPrice;
+    document.getElementById('sumNewPrice').textContent = plan.promo.newPrice;
+  }
+
+  // Features
+  const featEl = document.getElementById('sumFeatures');
+  featEl.innerHTML = plan.features.map(f =>
+    `<div class="summary-feat"><i class="ico">✓</i><span>${f}</span></div>`
+  ).join('');
+
+  // Totais
+  const price = `R$${plan.amount.toFixed(2).replace('.', ',')}`;
+  document.getElementById('totSubtotal').textContent = price;
+  document.getElementById('totTotal').textContent    = price;
+  document.getElementById('totDiscount').textContent = plan.promo ? '50% OFF hoje' : '—';
+  if (plan.promo) document.getElementById('totDiscount').style.color = 'var(--green)';
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MERCADO PAGO SDK
+   ══════════════════════════════════════════════════════════════ */
+let mp = null;
+
+function initMercadoPago() {
+  try {
+    mp = new MercadoPago(MP_PUBLIC_KEY, { locale: 'pt-BR' });
+  } catch (e) {
+    console.warn('[MP] SDK não carregado. Verifique a chave pública.', e);
+  }
+}
+
+/**
+ * Inicializa o Payment Brick do Mercado Pago.
+ * Chamado quando o usuário seleciona a aba "Cartão".
+ * Documentação: https://www.mercadopago.com.br/developers/pt/docs/checkout-bricks/payment-brick/introduction
+ */
+async function initPaymentBrick() {
+  if (!mp) {
+    document.getElementById('paymentBrick_container').innerHTML =
+      '<p style="color:var(--red);padding:20px;font-size:13px">⚠️ SDK do Mercado Pago não carregado. Verifique a chave pública.</p>';
+    return;
+  }
+
+  if (brickController) return; // já inicializado
+
+  const container = document.getElementById('paymentBrick_container');
+  container.innerHTML = '<div class="mp-loading"><div class="mp-loading-spin"></div>Carregando…</div>';
+
+  try {
+    const bricks = mp.bricks();
+
+    /**
+     * ⚠️ PREENCHA o preferenceId ou amount abaixo.
+     * Para gerar um preferenceId, chame seu backend:
+     *   POST /api/create-preference  →  retorna { id: "xxx" }
+     */
+    brickController = await bricks.create('payment', 'paymentBrick_container', {
+      initialization: {
+        amount: plan.amount,   // valor em R$
+        // preferenceId: "xxx", // use isso se quiser redirecionar para o Checkout Pro
+      },
+      customization: {
+        paymentMethods: {
+          creditCard:  'all',
+          debitCard:   'all',
+          ticket:      'all', // boleto/lotérica
+          bankTransfer: 'all',
+          atm:         'all',
+        },
+        visual: {
+          style: {
+            theme: 'dark',
+            customVariables: {
+              textPrimaryColor:    '#f1f1f7',
+              textSecondaryColor:  'rgba(255,255,255,0.65)',
+              inputBackgroundColor:'#111120',
+              formBackgroundColor: '#0d0d1a',
+              baseColor:           '#8b5cf6',
+            },
+          },
+        },
+      },
+      callbacks: {
+        onReady: () => {
+          console.log('[MP] Payment Brick pronto.');
+        },
+        onSubmit: async ({ selectedPaymentMethod, formData }) => {
+          /* ──────────────────────────────────────────────────────────
+             Enviar formData para o seu backend aqui.
+             O backend chama a API do Mercado Pago para criar o pagamento.
+             Exemplo:
+               POST /api/process-payment
+               Body: { ...formData, plan: planKey, customerEmail: ... }
+             ────────────────────────────────────────────────────────── */
+          showLoading('Processando pagamento…');
+          try {
+            const res = await fetch(`${API_BASE_URL}/process-payment`, {
+              method:  'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body:    JSON.stringify({
+                formData,
+                plan:  planKey,
+                email: document.getElementById('femail').value,
+                name:  document.getElementById('fname').value,
+                cpf:   document.getElementById('fcpf').value.replace(/\D/g,''),
+              }),
+            });
+            const result = await res.json();
+            hideLoading();
+            if (result.status === 'approved') {
+              showSuccess();
+            } else if (result.status === 'pending') {
+              toast('Pagamento pendente. Aguardando confirmação…', 'info');
+            } else {
+              toast('Pagamento não aprovado: ' + (result.status_detail || 'tente novamente'), 'err');
+            }
+          } catch (err) {
+            hideLoading();
+            toast('Erro ao processar pagamento. Tente novamente.', 'err');
+            console.error('[MP] Erro ao enviar pagamento:', err);
+          }
+        },
+        onError: (error) => {
+          console.error('[MP] Brick error:', error);
+          toast('Erro no formulário de pagamento.', 'err');
+        },
+      },
+    });
+  } catch (err) {
+    console.error('[MP] Erro ao criar Brick:', err);
+    container.innerHTML =
+      '<p style="color:var(--red);padding:20px;font-size:13px">⚠️ Erro ao inicializar o formulário de pagamento. Verifique sua chave pública.</p>';
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ABAS DE PAGAMENTO
+   ══════════════════════════════════════════════════════════════ */
+const TAB_CONFIG = {
+  pix:    { icon: '⚡', text: 'Pagar com PIX',     btnClass: 'pix',    sub: 'Aprovação instantânea · Sem taxas extras'                    },
+  card:   { icon: '💳', text: 'Pagar com Cartão',  btnClass: '',       sub: 'Parcelamento disponível · Processado pelo Mercado Pago'       },
+  boleto: { icon: '📄', text: 'Gerar boleto',      btnClass: 'boleto', sub: 'Vence em 3 dias úteis · Compensação em até 3 dias úteis'     },
+};
+
+function selectTab(tab) {
+  currentTab = tab;
+
+  // Painéis
+  ['pix','card','boleto'].forEach(t => {
+    document.getElementById('panel-' + t).classList.toggle('active', t === tab);
+    const btn = document.getElementById('tab-btn-' + t);
+    btn.className = 'pay-tab' + (t === tab ? ` active active-${t}` : '');
+  });
+
+  // Botão de pagamento
+  const cfg = TAB_CONFIG[tab];
+  const btnPay = document.getElementById('btnPay');
+  document.getElementById('btnPayIcon').textContent = cfg.icon;
+  document.getElementById('btnPayText').textContent = cfg.text;
+  document.getElementById('btnPaySub').textContent  = cfg.sub;
+  btnPay.className = 'btn-pay ' + cfg.btnClass;
+
+  // Inicializa o Brick apenas quando a aba de cartão é aberta
+  if (tab === 'card') initPaymentBrick();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PROCESSAR PAGAMENTO (PIX e Boleto)
+   Para Cartão, o Payment Brick lida sozinho via callback onSubmit.
+   ══════════════════════════════════════════════════════════════ */
+async function processPayment() {
+  if (!validateForm()) return;
+
+  const customer = {
+    name:  document.getElementById('fname').value.trim(),
+    email: document.getElementById('femail').value.trim(),
+    cpf:   document.getElementById('fcpf').value.replace(/\D/g, ''),
+    phone: document.getElementById('fphone').value.replace(/\D/g, ''),
+  };
+
+  if (currentTab === 'card') {
+    /* O botão de pagamento do Brick é interno ao MP; este botão
+       externo serve como fallback. Esconde o overlay e instrui o usuário. */
+    toast('Use o botão de pagamento dentro do formulário de cartão.', 'info');
+    return;
+  }
+
+  if (currentTab === 'pix') {
+    await createPixPayment(customer);
+  } else if (currentTab === 'boleto') {
+    await createBoletoPayment(customer);
+  }
+}
+
+/**
+ * Cria um pagamento PIX chamando o backend.
+ * O backend usa a API do Mercado Pago para criar o pagamento e retorna o QR Code.
+ */
+async function createPixPayment(customer) {
+  showLoading('Gerando QR Code PIX…');
+  try {
+    /**
+     * ⚠️ BACKEND: POST /api/create-pix
+     * Body:  { plan, amount, customer: { name, email, cpf, phone } }
+     * Retorno esperado:
+     * {
+     *   id: "12345678",
+     *   qr_code: "00020126...",           // código copia e cola
+     *   qr_code_base64: "iVBORw0KGgo…",  // imagem do QR em base64
+     *   expiration_date: "2026-05-03T23:59:00.000-03:00"
+     * }
+     */
+    const res = await fetch(`${API_BASE_URL}/create-pix`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ plan: planKey, amount: plan.amount, customer }),
+    });
+    const data = await res.json();
+    hideLoading();
+
+    if (data.qr_code) {
+      showPixQr(data);
+    } else {
+      toast('Erro ao gerar PIX: ' + (data.message || 'resposta inválida'), 'err');
+    }
+  } catch (err) {
+    hideLoading();
+    /* ── MODO DEMO (sem backend) ─────────────────────────────────
+       Remove este bloco em produção e conecte ao seu backend real. */
+    console.warn('[DEMO] Backend não disponível. Simulando PIX…');
+    showPixQr({
+      qr_code:        '00020126580014br.gov.bcb.pix0136demo-pix-key-jpgconvert@mercadopago.com5204000053039865802BR5925JPG Convert Plano Pro6009SAO PAULO62070503***6304DEMO',
+      qr_code_base64: null,
+      id:             'DEMO-' + Date.now(),
+    });
+    /* ───────────────────────────────────────────────────────────── */
+  }
+}
+
+function showPixQr(data) {
+  const zone = document.getElementById('pixQrZone');
+  zone.classList.add('visible');
+
+  // QR Image
+  const qrImg = document.getElementById('pixQrImg');
+  if (data.qr_code_base64) {
+    qrImg.innerHTML = `<img src="data:image/png;base64,${data.qr_code_base64}" alt="QR Code PIX" style="width:100%;height:100%;object-fit:contain;border-radius:8px;"/>`;
+  }
+
+  // Código copia e cola
+  document.getElementById('pixCopyCode').value = data.qr_code;
+
+  // Cronômetro (30 min padrão do MP)
+  startPixCountdown(30 * 60);
+
+  toast('QR Code gerado! Escaneie com o app do seu banco.', 'ok');
+}
+
+function startPixCountdown(seconds) {
+  if (pixCountdownInterval) clearInterval(pixCountdownInterval);
+  let remaining = seconds;
+  const el = document.getElementById('pixCountdown');
+
+  function tick() {
+    const m = Math.floor(remaining / 60);
+    const s = remaining % 60;
+    el.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    if (remaining <= 0) {
+      clearInterval(pixCountdownInterval);
+      el.textContent = 'Expirado';
+      el.style.color = 'var(--red)';
+    }
+    remaining--;
+  }
+  tick();
+  pixCountdownInterval = setInterval(tick, 1000);
+}
+
+function copyPixCode() {
+  const el = document.getElementById('pixCopyCode');
+  navigator.clipboard.writeText(el.value).then(() => {
+    toast('Código PIX copiado!', 'ok');
+  }).catch(() => {
+    el.select(); document.execCommand('copy');
+    toast('Código PIX copiado!', 'ok');
+  });
+}
+
+/**
+ * Cria boleto chamando o backend.
+ */
+async function createBoletoPayment(customer) {
+  showLoading('Gerando boleto…');
+  try {
+    /**
+     * ⚠️ BACKEND: POST /api/create-boleto
+     * Body:  { plan, amount, customer }
+     * Retorno: { barcode: "...", pdf_url: "...", expiration_date: "..." }
+     */
+    const res = await fetch(`${API_BASE_URL}/create-boleto`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ plan: planKey, amount: plan.amount, customer }),
+    });
+    const data = await res.json();
+    hideLoading();
+    if (data.pdf_url) {
+      window.open(data.pdf_url, '_blank');
+      toast('Boleto gerado! Abrindo em nova aba…', 'ok');
+    } else {
+      toast('Erro ao gerar boleto.', 'err');
+    }
+  } catch (err) {
+    hideLoading();
+    toast('Erro ao conectar com o servidor. Tente novamente.', 'err');
+    console.error('[Boleto]', err);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   VALIDAÇÃO DO FORMULÁRIO
+   ══════════════════════════════════════════════════════════════ */
+function validateForm() {
+  let valid = true;
+
+  const name  = document.getElementById('fname').value.trim();
+  const email = document.getElementById('femail').value.trim();
+  const cpf   = document.getElementById('fcpf').value.replace(/\D/g,'');
+
+  setFieldError('field-name',  !name || name.split(' ').length < 2);
+  setFieldError('field-email', !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
+  setFieldError('field-cpf',   cpf.length !== 11 || !validateCPF(cpf));
+
+  if (document.querySelector('.field.has-error')) {
+    valid = false;
+    document.querySelector('.field.has-error input').focus();
+    toast('Corrija os campos destacados em vermelho.', 'err');
+  }
+  return valid;
+}
+
+function setFieldError(fieldId, hasError) {
+  document.getElementById(fieldId).classList.toggle('has-error', hasError);
+}
+
+function validateCPF(cpf) {
+  if (/^(\d)\1+$/.test(cpf)) return false;
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += +cpf[i] * (10 - i);
+  let r = (sum * 10) % 11; if (r === 10 || r === 11) r = 0;
+  if (r !== +cpf[9]) return false;
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += +cpf[i] * (11 - i);
+  r = (sum * 10) % 11; if (r === 10 || r === 11) r = 0;
+  return r === +cpf[10];
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MÁSCARAS DE INPUT
+   ══════════════════════════════════════════════════════════════ */
+function initMasks() {
+  // CPF: 000.000.000-00
+  document.getElementById('fcpf').addEventListener('input', function () {
+    let v = this.value.replace(/\D/g,'').slice(0,11);
+    v = v.replace(/(\d{3})(\d)/,     '$1.$2')
+         .replace(/(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
+         .replace(/\.(\d{3})(\d)/,    '.$1-$2');
+    this.value = v;
+    setFieldError('field-cpf', false);
+  });
+
+  // Telefone: (00) 00000-0000
+  document.getElementById('fphone').addEventListener('input', function () {
+    let v = this.value.replace(/\D/g,'').slice(0,11);
+    if (v.length > 10) {
+      v = v.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+    } else {
+      v = v.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
+    }
+    this.value = v.replace(/-$/, '');
+  });
+
+  // Remove erro ao digitar
+  ['fname','femail'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {
+      const field = id === 'fname' ? 'field-name' : 'field-email';
+      setFieldError(field, false);
+    });
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   LOADING / SUCESSO / TOASTS
+   ══════════════════════════════════════════════════════════════ */
+function showLoading(msg) {
+  document.getElementById('loadingText').textContent = msg || 'Processando…';
+  document.getElementById('loadingOverlay').classList.add('visible');
+}
+function hideLoading() {
+  document.getElementById('loadingOverlay').classList.remove('visible');
+}
+
+function showSuccess() {
+  hideLoading();
+  document.getElementById('sucPlan').textContent = plan.name;
+  document.getElementById('sucEmail').textContent = document.getElementById('femail').value;
+  const next = new Date(); next.setMonth(next.getMonth() + 1);
+  document.getElementById('sucNextCharge').textContent =
+    next.toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric' });
+  document.getElementById('successModal').classList.add('visible');
+
+  /* ⚠️ Em produção: salvar o plano no localStorage/backend após confirmação */
+  // localStorage.setItem('jpgconv_plan', planKey);
+}
+
+function goToConverter() {
+  localStorage.setItem('jpgconv_plan', planKey);
+  window.location.href = 'conversor-jpg.html?activated=' + planKey;
+}
+
+function toast(msg, type = '') {
+  const w = document.getElementById('toasts');
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = msg;
+  w.appendChild(t);
+  setTimeout(() => t.remove(), 4500);
+}
+</script>
+
+<!-- ════════════════════════════════════════════════════════════════
+     EXEMPLOS DE BACKEND (Node.js/Express)
+     Copie em um arquivo separado — ex: server.js
+     Instale: npm install express mercadopago
+     ════════════════════════════════════════════════════════════════
+
+const express = require('express');
+const { MercadoPagoConfig, Payment, Preference } = require('mercadopago');
+const app = express();
+app.use(express.json());
+
+// ⚠️ Substitua pelo seu Access Token
+// Obtenha em: https://www.mercadopago.com.br/developers/pt/docs/getting-started
+const client = new MercadoPagoConfig({
+  accessToken: 'TEST-xxxxxxxxxxxx', // APP_USR-xxx em produção
+});
+
+// ── Criar pagamento PIX ──────────────────────────────────────────
+app.post('/api/create-pix', async (req, res) => {
+  const { plan, amount, customer } = req.body;
+  const payment = new Payment(client);
+  try {
+    const result = await payment.create({
+      body: {
+        transaction_amount: amount,
+        description:        `JPG.convert — Plano ${plan}`,
+        payment_method_id:  'pix',
+        payer: {
+          email:          customer.email,
+          first_name:     customer.name.split(' ')[0],
+          last_name:      customer.name.split(' ').slice(1).join(' '),
+          identification: { type: 'CPF', number: customer.cpf },
+        },
+      },
+    });
+    res.json({
+      id:              result.id,
+      status:          result.status,
+      qr_code:         result.point_of_interaction.transaction_data.qr_code,
+      qr_code_base64:  result.point_of_interaction.transaction_data.qr_code_base64,
+      expiration_date: result.date_of_expiration,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ── Processar pagamento de cartão (enviado pelo Payment Brick) ───
+app.post('/api/process-payment', async (req, res) => {
+  const { formData, plan, email, name, cpf } = req.body;
+  const payment = new Payment(client);
+  try {
+    const result = await payment.create({
+      body: {
+        transaction_amount: formData.transaction_amount,
+        token:              formData.token,
+        installments:       formData.installments,
+        payment_method_id:  formData.payment_method_id,
+        issuer_id:          formData.issuer_id,
+        description:        `JPG.convert — Plano ${plan}`,
+        payer: {
+          email,
+          identification: { type: 'CPF', number: cpf },
+        },
+      },
+    });
+    res.json({ status: result.status, status_detail: result.status_detail, id: result.id });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ── Criar boleto ─────────────────────────────────────────────────
+app.post('/api/create-boleto', async (req, res) => {
+  const { plan, amount, customer } = req.body;
+  const payment = new Payment(client);
+  try {
+    const result = await payment.create({
+      body: {
+        transaction_amount: amount,
+        description:        `JPG.convert — Plano ${plan}`,
+        payment_method_id:  'bolbradesco', // ou 'pec'
+        payer: {
+          email:          customer.email,
+          first_name:     customer.name.split(' ')[0],
+          last_name:      customer.name.split(' ').slice(1).join(' '),
+          identification: { type: 'CPF', number: customer.cpf },
+          address: {
+            zip_code:        '01310-100',
+            street_name:     'Av. Paulista',
+            street_number:   '1000',
+            neighborhood:    'Bela Vista',
+            city:            'São Paulo',
+            federal_unit:    'SP',
+          },
+        },
+      },
+    });
+    res.json({
+      id:              result.id,
+      status:          result.status,
+      barcode:         result.barcode?.content,
+      pdf_url:         result.transaction_details?.external_resource_url,
+      expiration_date: result.date_of_expiration,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ── Webhook para confirmar pagamento ─────────────────────────────
+// Configure em: https://www.mercadopago.com.br/developers/pt/docs/notifications/webhooks
+app.post('/api/webhook', async (req, res) => {
+  const { type, data } = req.body;
+  if (type === 'payment') {
+    const payment = new Payment(client);
+    const result = await payment.get({ id: data.id });
+    if (result.status === 'approved') {
+      // ✅ Pagamento aprovado: ative o plano para o usuário
+      // Ex: db.users.update({ email: result.payer.email }, { plan: result.description })
+      console.log('Pagamento aprovado:', result.id, result.payer.email);
+    }
+  }
+  res.sendStatus(200);
+});
+
+app.listen(3000, () => console.log('Server running on :3000'));
+
+     ════════════════════════════════════════════════════════════════ -->
+
+</body>
+</html>

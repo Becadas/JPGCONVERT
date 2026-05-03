@@ -1,0 +1,1669 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>JPG.CONVERT — Conversor de Imagens</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #080811;
+      --bg2:       #0d0d1a;
+      --bg3:       #131324;
+      --border:    rgba(255,255,255,0.07);
+      --border-hl: rgba(139,92,246,0.5);
+      --purple:    #8b5cf6;
+      --purple-lt: #a78bfa;
+      --cyan:      #22d3ee;
+      --green:     #10b981;
+      --red:       #f87171;
+      --amber:     #fbbf24;
+      --text:      #f1f5f9;
+      --muted:     #64748b;
+      --muted2:    #94a3b8;
+      --radius:    12px;
+      --glow:      0 0 24px rgba(139,92,246,0.35);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(139,92,246,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(139,92,246,0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none; z-index: 0;
+    }
+    body::after {
+      content: '';
+      position: fixed;
+      top: -200px; left: 50%; transform: translateX(-50%);
+      width: 800px; height: 500px;
+      background: radial-gradient(ellipse, rgba(139,92,246,0.12) 0%, transparent 70%);
+      pointer-events: none; z-index: 0;
+    }
+
+    /* ══════════════════════════ NAV */
+    nav {
+      position: sticky; top: 0; z-index: 300;
+      background: rgba(8,8,17,0.88);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      height: 60px;
+      display: flex; align-items: center;
+      padding: 0 32px; gap: 20px;
+    }
+
+    .logo {
+      display: flex; align-items: center; gap: 10px;
+      text-decoration: none; flex-shrink: 0;
+    }
+    .logo-icon {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, var(--purple), var(--cyan));
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      box-shadow: 0 0 16px rgba(139,92,246,0.5);
+    }
+    .logo-text { font-size: 17px; font-weight: 800; letter-spacing: -0.5px; color: var(--text); }
+    .logo-text span { color: var(--purple-lt); }
+
+    /* Contador gratuito na nav */
+    .free-counter {
+      display: flex; align-items: center; gap: 7px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 12px; font-weight: 700; color: var(--muted2);
+      cursor: default;
+    }
+    .free-counter .dots { display: flex; gap: 4px; }
+    .dot-item {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--border);
+      transition: background .3s;
+    }
+    .dot-item.used { background: var(--purple); box-shadow: 0 0 6px rgba(139,92,246,0.6); }
+    .dot-item.empty { background: rgba(255,255,255,0.1); }
+
+    .fc-info { display: flex; flex-direction: column; gap: 1px; }
+    .fc-reset {
+      font-size: 10px; font-weight: 700; color: var(--muted);
+      font-variant-numeric: tabular-nums; letter-spacing: 0.3px;
+      display: none;
+    }
+    .free-counter.danger .fc-reset { display: block; color: var(--red); }
+
+    .free-counter.warning { border-color: rgba(251,191,36,0.4); }
+    .free-counter.warning .fc-label { color: var(--amber); }
+    .free-counter.danger { border-color: rgba(248,113,113,0.4); }
+    .free-counter.danger .fc-label { color: var(--red); }
+
+    .nav-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+    .btn-ver-planos {
+      display: flex; align-items: center; gap: 6px;
+      background: linear-gradient(135deg, var(--purple), #6d28d9);
+      color: #fff; font-size: 13px; font-weight: 700;
+      padding: 8px 18px; border: none; border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 2px 12px rgba(139,92,246,0.35);
+      transition: opacity .15s, transform .1s;
+    }
+    .btn-ver-planos:hover { opacity: .9; transform: translateY(-1px); }
+
+    /* ══════════════════════════ MAIN */
+    main {
+      flex: 1; position: relative; z-index: 1;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 72px 24px 80px;
+    }
+
+    /* ─── TELA INICIAL ─── */
+    #uploadScreen { width: 100%; max-width: 700px; text-align: center; }
+
+    .hero-tag {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(139,92,246,0.1);
+      border: 1px solid rgba(139,92,246,0.25);
+      color: var(--purple-lt);
+      font-size: 12px; font-weight: 600;
+      padding: 5px 14px; border-radius: 20px;
+      margin-bottom: 24px; letter-spacing: 0.3px;
+    }
+    .hero-tag::before {
+      content: '';
+      width: 6px; height: 6px;
+      background: var(--purple); border-radius: 50%;
+      box-shadow: 0 0 6px var(--purple);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    .hero-title {
+      font-size: 52px; font-weight: 900;
+      letter-spacing: -2px; line-height: 1.05;
+      margin-bottom: 20px;
+      background: linear-gradient(135deg, #fff 40%, var(--purple-lt) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-sub { font-size: 16px; color: var(--muted2); line-height: 1.7; margin-bottom: 8px; }
+
+    .fmt-tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 20px 0 36px; }
+    .fmt-tag {
+      background: var(--bg3); border: 1px solid var(--border);
+      color: var(--muted2); font-size: 12px; font-weight: 700;
+      padding: 5px 12px; border-radius: 6px; letter-spacing: 0.5px;
+      transition: border-color .2s, color .2s;
+    }
+    .fmt-tag:hover { border-color: var(--purple); color: var(--purple-lt); }
+
+    /* ─── Zona de drop ─── */
+    .drop-zone {
+      position: relative;
+      border: 2px dashed rgba(139,92,246,0.3);
+      border-radius: 20px; padding: 56px 32px;
+      cursor: pointer;
+      background: rgba(13,13,26,0.6);
+      transition: border-color .2s, background .2s, box-shadow .2s;
+      margin-bottom: 32px; overflow: hidden;
+      display: flex; flex-direction: column;
+      align-items: center; text-align: center;
+    }
+    .drop-zone::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at center, rgba(139,92,246,0.06) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--purple);
+      background: rgba(139,92,246,0.06);
+      box-shadow: var(--glow), inset 0 0 60px rgba(139,92,246,0.04);
+    }
+    .drop-zone-icon { font-size: 56px; margin-bottom: 16px; display: block; filter: drop-shadow(0 0 16px rgba(139,92,246,0.5)); }
+    .drop-zone h2  { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+    .drop-zone p   { font-size: 14px; color: var(--muted); margin-bottom: 28px; }
+
+    .btn-upload {
+      display: inline-flex; align-items: center; gap: 9px;
+      background: linear-gradient(135deg, var(--purple), #6d28d9);
+      color: #fff; font-size: 15px; font-weight: 700;
+      padding: 14px 36px; border: none; border-radius: 10px;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(139,92,246,0.4);
+      transition: opacity .15s, transform .1s, box-shadow .15s;
+    }
+    .btn-upload:hover { opacity:.9; transform:translateY(-1px); box-shadow:0 8px 28px rgba(139,92,246,0.5); }
+    .drop-hint { margin-top: 16px; font-size: 13px; color: var(--muted); }
+
+    .feature-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+    .feat {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 14px; padding: 20px; text-align: left;
+      transition: border-color .2s;
+    }
+    .feat:hover { border-color: rgba(139,92,246,0.3); }
+    .feat-icon {
+      width: 36px; height: 36px; border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; margin-bottom: 12px;
+    }
+    .feat-icon.purple { background: rgba(139,92,246,0.15); }
+    .feat-icon.cyan   { background: rgba(34,211,238,0.12); }
+    .feat-icon.green  { background: rgba(16,185,129,0.12); }
+    .feat h4 { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 5px; }
+    .feat p  { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+    /* ══════════════════════════ WORKSPACE */
+    #workspace { display: none; width: 100%; max-width: 1060px; flex-direction: column; gap: 16px; }
+    #workspace.split { flex-direction: row; align-items: flex-start; gap: 20px; }
+
+    /* Coluna principal do workspace */
+    .ws-main { display: flex; flex-direction: column; gap: 16px; flex: 1; min-width: 0; }
+
+    /* Sidebar de convertidos */
+    .conv-sidebar {
+      display: none; flex-direction: column;
+      width: 256px; min-width: 220px; max-width: 256px;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 16px; overflow: hidden;
+      position: sticky; top: 88px;
+      max-height: calc(100vh - 120px);
+    }
+    #workspace.split .conv-sidebar { display: flex; }
+
+    .sidebar-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      padding: 12px 14px; flex-shrink: 0;
+      background: rgba(16,185,129,0.07); border-bottom: 1px solid var(--border);
+      font-size: 12px; font-weight: 800; color: var(--text);
+    }
+    .sidebar-count-badge {
+      background: var(--green); color: #fff;
+      font-size: 10px; font-weight: 800; padding: 1px 7px; border-radius: 20px;
+      margin-left: 4px;
+    }
+    .sidebar-dl-all {
+      background: var(--green); color: #fff; border: none;
+      border-radius: 6px; padding: 4px 10px;
+      font-size: 11px; font-weight: 800; cursor: pointer; white-space: nowrap;
+    }
+    .sidebar-dl-all:hover { opacity: .85; }
+    .sidebar-list { flex: 1; overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 4px; }
+
+    .sidebar-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 8px; border-radius: 8px;
+      border: 1px solid transparent; cursor: default;
+      transition: background .15s;
+    }
+    .sidebar-item:hover { background: var(--bg3); border-color: var(--border); }
+    .sidebar-thumb {
+      width: 34px; height: 34px; border-radius: 6px; flex-shrink: 0;
+      background: var(--bg3); overflow: hidden;
+      display: flex; align-items: center; justify-content: center; font-size: 14px;
+    }
+    .sidebar-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .sidebar-name {
+      flex: 1; font-size: 11px; color: var(--text); min-width: 0;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .sidebar-dl {
+      background: none; border: 1px solid var(--border); color: var(--muted2);
+      border-radius: 6px; padding: 3px 8px; font-size: 10px; font-weight: 700;
+      cursor: pointer; flex-shrink: 0; white-space: nowrap;
+      transition: border-color .15s, color .15s;
+    }
+    .sidebar-dl:hover { border-color: var(--green); color: var(--green); }
+
+    .ws-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+    .ws-count { font-size: 14px; font-weight: 700; color: var(--text); }
+    .ws-count span {
+      background: rgba(139,92,246,0.2); color: var(--purple-lt);
+      font-size: 12px; padding: 2px 10px; border-radius: 20px; margin-left: 8px;
+    }
+
+    .btn-add-more {
+      position: relative; display: inline-flex; align-items: center; gap: 6px;
+      background: var(--bg3); border: 1px solid var(--border);
+      color: var(--muted2); font-size: 13px; font-weight: 600;
+      padding: 8px 16px; border-radius: 8px; cursor: pointer;
+      transition: border-color .15s, color .15s; overflow: hidden;
+    }
+    .btn-add-more:hover { border-color: var(--purple); color: var(--purple-lt); }
+    .btn-add-more input { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 0; }
+
+    .file-list { display: flex; flex-direction: column; gap: 8px; }
+
+    .file-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 12px; padding: 14px 16px;
+      display: flex; align-items: center; gap: 14px;
+      transition: border-color .2s;
+    }
+    .file-card.converting { border-color: rgba(139,92,246,0.5); }
+    .file-card.done  { border-color: rgba(16,185,129,0.4); }
+    .file-card.error { border-color: rgba(248,113,113,0.4); }
+
+    .file-thumb {
+      width: 48px; height: 48px; border-radius: 8px;
+      border: 1px solid var(--border); flex-shrink: 0;
+      background: var(--bg3); overflow: hidden;
+      display: flex; align-items: center; justify-content: center; font-size: 22px;
+    }
+    .file-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .file-meta { flex: 1; min-width: 0; }
+    .file-name { font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-info { font-size: 12px; color: var(--muted); margin-top: 3px; }
+    .file-bar { height: 3px; background: var(--bg3); border-radius: 3px; margin-top: 8px; overflow: hidden; display: none; }
+    .file-card.converting .file-bar { display: block; }
+    .file-bar-fill { height: 100%; background: linear-gradient(90deg, var(--purple), var(--cyan)); border-radius: 3px; width: 0%; transition: width .3s; }
+
+    .file-badge {
+      flex-shrink: 0; font-size: 12px; font-weight: 700;
+      padding: 4px 10px; border-radius: 6px;
+    }
+    .file-badge.pending    { background: var(--bg3); color: var(--muted); }
+    .file-badge.converting { background: rgba(139,92,246,0.15); color: var(--purple-lt); }
+    .file-badge.done       { background: rgba(16,185,129,0.15); color: var(--green); }
+    .file-badge.error      { background: rgba(248,113,113,0.12); color: var(--red); font-size: 11px; }
+
+    .file-rm {
+      background: none; border: none; color: var(--muted);
+      cursor: pointer; font-size: 18px; width: 30px; height: 30px;
+      border-radius: 6px; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: background .15s, color .15s;
+    }
+    .file-rm:hover { background: rgba(248,113,113,0.1); color: var(--red); }
+    .file-rm:disabled { opacity: .3; cursor: default; }
+
+    .quality-panel { background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; padding: 24px; }
+    .qp-title { font-size: 13px; font-weight: 700; color: var(--muted2); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 16px; }
+
+    .qp-free-lock {
+      display: none; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 14px 16px; margin-bottom: 20px;
+      background: rgba(255,255,255,0.025);
+      border: 1px solid var(--border); border-radius: 12px;
+    }
+    .qp-lock-info { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted2); }
+    .qp-lock-icon { font-size: 16px; flex-shrink: 0; }
+    .qp-lock-info strong { color: var(--text); }
+    .qp-lock-sub { color: var(--muted); font-size: 12px; }
+    .qp-upgrade-btn {
+      flex-shrink: 0; padding: 6px 14px;
+      background: transparent; border: 1px solid var(--purple);
+      color: var(--purple-lt); border-radius: 8px;
+      font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap;
+      transition: background .15s;
+    }
+    .qp-upgrade-btn:hover { background: rgba(139,92,246,0.12); }
+
+    .quality-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+
+    .q-opt {
+      border: 1.5px solid var(--border); border-radius: 10px;
+      padding: 16px; cursor: pointer;
+      transition: border-color .2s, background .2s;
+    }
+    .q-opt:hover { border-color: rgba(139,92,246,0.4); background: rgba(139,92,246,0.03); }
+    .q-opt.active { border-color: var(--purple); background: rgba(139,92,246,0.07); box-shadow: 0 0 0 3px rgba(139,92,246,0.1); }
+
+    .q-opt-header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+    .q-dot { width: 16px; height: 16px; border: 2px solid var(--muted); border-radius: 50%; flex-shrink: 0; transition: border-color .2s; display: flex; align-items: center; justify-content: center; }
+    .q-opt.active .q-dot { border-color: var(--purple); }
+    .q-opt.active .q-dot::after { content: ''; width: 8px; height: 8px; background: var(--purple); border-radius: 50%; }
+    .q-label { font-size: 14px; font-weight: 700; color: var(--text); }
+    .q-badge { margin-left: auto; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: rgba(251,191,36,0.15); color: var(--amber); border: 1px solid rgba(251,191,36,0.2); }
+    .q-desc  { font-size: 12px; color: var(--muted); line-height: 1.4; padding-left: 26px; }
+    .slider-wrap { display: none; padding: 12px 0 4px; }
+    .q-opt.active .slider-wrap { display: block; }
+    .slider-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+    .slider-label strong { color: var(--purple-lt); }
+    input[type=range] { width: 100%; accent-color: var(--purple); cursor: pointer; }
+
+    .btn-convert {
+      width: 100%;
+      background: linear-gradient(135deg, var(--purple), #6d28d9);
+      color: #fff; font-size: 15px; font-weight: 800;
+      padding: 17px; border: none; border-radius: 10px;
+      cursor: pointer; letter-spacing: 0.5px; text-transform: uppercase;
+      transition: opacity .15s, transform .1s, box-shadow .2s;
+      box-shadow: 0 4px 20px rgba(139,92,246,0.35);
+    }
+    .btn-convert:hover:not(:disabled) { opacity:.92; transform:translateY(-1px); box-shadow:0 8px 28px rgba(139,92,246,0.5); }
+    .btn-convert:disabled { opacity:.4; cursor:not-allowed; transform:none; }
+
+    /* ══════════════════════════ DOWNLOAD */
+    #downloadSection { display: none; width: 100%; max-width: 780px; flex-direction: column; gap: 16px; }
+    .dl-hero {
+      background: var(--bg2); border: 1px solid rgba(16,185,129,0.3);
+      border-radius: 20px; padding: 40px; text-align: center;
+      box-shadow: 0 0 40px rgba(16,185,129,0.08);
+    }
+    .dl-checkmark {
+      width: 72px; height: 72px;
+      background: rgba(16,185,129,0.15);
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px; font-size: 34px;
+      border: 2px solid rgba(16,185,129,0.3);
+      box-shadow: 0 0 30px rgba(16,185,129,0.2);
+    }
+    .dl-hero h2 { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; color: var(--text); margin-bottom: 8px; }
+    .dl-hero p  { font-size: 14px; color: var(--muted); margin-bottom: 28px; }
+    .dl-stats { display: flex; justify-content: center; gap: 40px; margin-bottom: 32px; }
+    .dl-stat-n { font-size: 32px; font-weight: 900; color: var(--text); letter-spacing: -1px; }
+    .dl-stat-l { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    .btn-dl-main {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: linear-gradient(135deg, var(--green), #059669);
+      color: #fff; font-size: 15px; font-weight: 800;
+      padding: 16px 40px; border: none; border-radius: 10px;
+      cursor: pointer; box-shadow: 0 4px 20px rgba(16,185,129,0.35);
+      transition: opacity .15s, transform .1s;
+    }
+    .btn-dl-main:hover { opacity:.9; transform:translateY(-1px); }
+
+    .btn-dl-reset {
+      background: none; border: 1px solid var(--border);
+      color: var(--muted2); font-size: 13px; font-weight: 600;
+      padding: 12px 28px; border-radius: 10px; cursor: pointer; margin-top: 12px;
+      transition: border-color .15s, color .15s;
+    }
+    .btn-dl-reset:hover { border-color: var(--purple); color: var(--purple-lt); }
+
+    .converted-list { display: flex; flex-direction: column; gap: 8px; }
+    .conv-item {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px 16px;
+      display: flex; align-items: center; gap: 12px; transition: border-color .2s;
+    }
+    .conv-item:hover { border-color: rgba(16,185,129,0.3); }
+    .conv-thumb {
+      width: 42px; height: 42px; border-radius: 6px; overflow: hidden;
+      flex-shrink: 0; background: var(--bg3); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center; font-size: 18px;
+    }
+    .conv-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .conv-name { flex: 1; font-size: 13px; font-weight: 600; color: var(--text); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .conv-size { font-size: 12px; color: var(--muted); flex-shrink: 0; }
+    .btn-dl-single {
+      background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.25);
+      color: var(--green); font-size: 12px; font-weight: 700;
+      padding: 6px 14px; border-radius: 6px; cursor: pointer; flex-shrink: 0;
+      transition: background .15s, color .15s;
+    }
+    .btn-dl-single:hover { background: var(--green); color: #fff; }
+
+    /* ══════════════════════════ MODAL DE PLANOS */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 1000;
+      background: rgba(4,4,12,0.92);
+      backdrop-filter: blur(16px);
+      display: none; align-items: flex-start; justify-content: center;
+      padding: 40px 24px; overflow-y: auto;
+    }
+    .modal-overlay.open { display: flex; }
+
+    .modal-box {
+      width: 100%; max-width: 1100px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 48px 40px;
+      position: relative;
+      animation: modalIn .3s ease;
+    }
+    @keyframes modalIn { from { opacity:0; transform:scale(.95) translateY(20px); } to { opacity:1; transform:scale(1) translateY(0); } }
+
+    .modal-close {
+      position: absolute; top: 20px; right: 20px;
+      background: var(--bg3); border: 1px solid var(--border);
+      color: var(--muted2); width: 36px; height: 36px;
+      border-radius: 8px; cursor: pointer; font-size: 18px;
+      display: flex; align-items: center; justify-content: center;
+      transition: color .15s, border-color .15s;
+    }
+    .modal-close:hover { color: var(--text); border-color: var(--purple); }
+
+    /* Cabeçalho do modal */
+    .modal-head { text-align: center; margin-bottom: 40px; }
+    .modal-eyebrow {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.25);
+      color: var(--red); font-size: 12px; font-weight: 700;
+      padding: 5px 14px; border-radius: 20px; margin-bottom: 16px;
+    }
+    .modal-eyebrow::before { content:'⚡'; }
+
+    .modal-head h2 {
+      font-size: 36px; font-weight: 900; letter-spacing: -1px;
+      margin-bottom: 10px;
+      background: linear-gradient(135deg, #fff 50%, var(--purple-lt));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .modal-head p { font-size: 15px; color: var(--muted2); }
+
+    /* Cards de planos */
+    .plans-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+
+    .plan-card {
+      background: var(--bg3);
+      border: 1.5px solid var(--border);
+      border-radius: 18px;
+      padding: 28px 24px;
+      display: flex; flex-direction: column;
+      position: relative;
+      transition: border-color .2s, transform .2s;
+    }
+    .plan-card:hover { transform: translateY(-4px); }
+
+    /* Plano do meio — DESTAQUE */
+    .plan-card.featured {
+      background: linear-gradient(160deg, #0f0f22 0%, #130d24 100%);
+      border-color: var(--purple);
+      box-shadow: 0 0 0 1px var(--purple), 0 8px 40px rgba(139,92,246,0.25);
+      transform: scale(1.03);
+    }
+    .plan-card.featured:hover { transform: scale(1.03) translateY(-4px); }
+
+    /* Plano topo — destaque secundário */
+    .plan-card.best-value {
+      border-color: rgba(34,211,238,0.4);
+    }
+
+    .plan-badge {
+      position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
+      font-size: 11px; font-weight: 800;
+      padding: 4px 16px; border-radius: 20px;
+      white-space: nowrap; letter-spacing: 0.5px;
+    }
+    .plan-badge.popular  { background: var(--purple); color: #fff; box-shadow: 0 2px 12px rgba(139,92,246,0.5); }
+    .plan-badge.bestval  { background: linear-gradient(90deg, var(--cyan), var(--green)); color: #0a0a0f; }
+
+    .plan-name  { font-size: 14px; font-weight: 700; color: var(--muted2); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 12px; }
+
+    .plan-price {
+      display: flex; align-items: baseline; gap: 4px;
+      margin-bottom: 4px;
+    }
+    .price-currency { font-size: 16px; font-weight: 700; color: var(--text); margin-top: 4px; }
+    .price-number   { font-size: 42px; font-weight: 900; letter-spacing: -2px; color: var(--text); line-height: 1; }
+    .price-cents    { font-size: 20px; font-weight: 700; color: var(--text); margin-top: 4px; }
+
+    .plan-period { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+
+    /* Tag "Só R$X a mais" */
+    .plan-diff-tag {
+      display: inline-block;
+      background: rgba(34,211,238,0.1);
+      border: 1px solid rgba(34,211,238,0.25);
+      color: var(--cyan); font-size: 11px; font-weight: 700;
+      padding: 3px 10px; border-radius: 6px;
+      margin-bottom: 20px;
+    }
+
+    .plan-divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+
+    .plan-features { list-style: none; display: flex; flex-direction: column; gap: 10px; flex: 1; margin-bottom: 24px; }
+    .plan-features li {
+      display: flex; align-items: flex-start; gap: 10px;
+      font-size: 13px; color: var(--muted2); line-height: 1.4;
+    }
+    .plan-features li .ico { flex-shrink: 0; font-size: 14px; margin-top: 1px; }
+    .plan-features li .ico.yes { color: var(--green); }
+    .plan-features li .ico.no  { color: rgba(255,255,255,0.2); }
+    .plan-features li strong   { color: var(--text); }
+
+    .plan-features li.highlight {
+      background: rgba(139,92,246,0.08); border: 1px solid rgba(139,92,246,0.15);
+      border-radius: 8px; padding: 8px 10px; color: var(--text);
+    }
+
+    /* Plano grátis — coluna de referência */
+    .plan-card.free-tier {
+      opacity: .75; border-style: dashed;
+    }
+    .plan-card.free-tier:hover { transform: none; opacity: .85; }
+
+    /* Preço antigo riscado */
+    .plan-old-price {
+      font-size: 11px; color: var(--muted); text-align: center;
+      margin-top: -4px; margin-bottom: 6px;
+    }
+    .plan-old-price s { opacity: .5; }
+    .plan-old-price strong { color: var(--cyan); font-size: 12px; }
+
+    .btn-plan {
+      width: 100%; padding: 14px;
+      font-size: 14px; font-weight: 800;
+      border: none; border-radius: 10px; cursor: pointer;
+      letter-spacing: 0.3px;
+      transition: opacity .15s, transform .1s;
+    }
+    .btn-plan:hover { opacity:.9; transform:translateY(-1px); }
+
+    .btn-plan.ghost {
+      background: var(--bg2); border: 1.5px solid var(--border);
+      color: var(--muted2);
+    }
+    .btn-plan.ghost:hover { border-color: var(--purple); color: var(--purple-lt); }
+
+    .btn-plan.primary {
+      background: linear-gradient(135deg, var(--purple), #6d28d9);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(139,92,246,0.4);
+    }
+
+    .btn-plan.top {
+      background: linear-gradient(135deg, var(--cyan), #0891b2);
+      color: #0a0a0f;
+      box-shadow: 0 4px 20px rgba(34,211,238,0.3);
+    }
+
+    .modal-footer-note {
+      text-align: center; margin-top: 28px;
+      font-size: 12px; color: var(--muted);
+    }
+    .modal-footer-note span { color: var(--green); font-weight: 700; }
+
+    /* Comparação abaixo dos cards */
+    .plan-compare {
+      margin-top: 24px;
+      background: rgba(16,185,129,0.05);
+      border: 1px solid rgba(16,185,129,0.15);
+      border-radius: 12px;
+      padding: 16px 20px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .plan-compare-icon { font-size: 24px; flex-shrink: 0; }
+    .plan-compare p { font-size: 13px; color: var(--muted2); line-height: 1.5; }
+    .plan-compare strong { color: var(--cyan); }
+
+    /* ══════════════════════════ BANNER LIMITE */
+    .limit-banner {
+      display: none;
+      background: linear-gradient(135deg, rgba(248,113,113,0.08), rgba(139,92,246,0.06));
+      border: 1px solid rgba(248,113,113,0.25);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 16px;
+      align-items: center; gap: 14px;
+      flex-wrap: wrap;
+    }
+    .limit-banner.show { display: flex; }
+    .limit-banner-icon { font-size: 28px; flex-shrink: 0; }
+    .limit-banner-text { flex: 1; }
+    .limit-banner-text strong { font-size: 14px; color: var(--text); display: block; margin-bottom: 3px; }
+    .limit-banner-text p { font-size: 13px; color: var(--muted2); }
+    .btn-upgrade-banner {
+      background: linear-gradient(135deg, var(--purple), #6d28d9);
+      color: #fff; font-size: 13px; font-weight: 700;
+      padding: 10px 20px; border: none; border-radius: 8px;
+      cursor: pointer; white-space: nowrap;
+      box-shadow: 0 2px 12px rgba(139,92,246,0.4);
+      transition: opacity .15s;
+    }
+    .btn-upgrade-banner:hover { opacity:.9; }
+
+    /* ══════════════════════════ OVERLAY DROP */
+    #drop-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(8,8,17,0.85);
+      border: 3px dashed var(--purple); z-index: 9999;
+      align-items: center; justify-content: center;
+      backdrop-filter: blur(8px);
+    }
+    #drop-overlay.active { display: flex; }
+    #drop-overlay .drop-msg {
+      font-size: 28px; font-weight: 900; color: var(--purple-lt);
+      background: var(--bg2); border: 1px solid var(--border-hl);
+      padding: 28px 56px; border-radius: 20px;
+      letter-spacing: -0.5px; box-shadow: var(--glow);
+    }
+
+    /* TOASTS */
+    .toasts { position: fixed; bottom: 24px; right: 24px; display: flex; flex-direction: column; gap: 8px; z-index: 10000; }
+    .toast {
+      background: var(--bg3); border: 1px solid var(--border);
+      color: var(--text); font-size: 13px; font-weight: 600;
+      padding: 12px 18px; border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      animation: slideIn .25s ease;
+    }
+    .toast.err  { border-color: rgba(248,113,113,0.4); color: var(--red); }
+    .toast.ok   { border-color: rgba(16,185,129,0.4); color: var(--green); }
+    .toast.info { border-color: rgba(139,92,246,0.4); color: var(--purple-lt); }
+    @keyframes slideIn { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:translateX(0)} }
+
+    /* FOOTER */
+    footer {
+      position: relative; z-index: 1;
+      border-top: 1px solid var(--border);
+      padding: 20px 32px;
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+    }
+    footer p { font-size: 12px; color: var(--muted); }
+    .footer-formats { display: flex; gap: 6px; flex-wrap: wrap; }
+    .footer-fmt { font-size: 11px; font-weight: 700; color: var(--muted); background: var(--bg3); padding: 3px 8px; border-radius: 4px; }
+
+    /* ══════════════════════════ BANNERS INLINE DE PROMOÇÃO */
+    .promo-inline {
+      display: flex; flex-direction: column; align-items: center;
+      text-align: center; gap: 4px;
+      background: linear-gradient(135deg, rgba(124,58,237,0.13), rgba(14,116,144,0.09));
+      border: 1px solid rgba(139,92,246,0.35);
+      border-radius: 16px;
+      padding: 18px 28px;
+      margin: 0 auto 28px;
+      max-width: 520px; width: 100%;
+      box-shadow: 0 0 28px rgba(139,92,246,0.12);
+    }
+    .pi-line1 {
+      font-size: 13px; font-weight: 800;
+      color: #fff; letter-spacing: 0.2px;
+    }
+    .pi-line2 {
+      font-size: 12px; color: var(--muted2); margin-bottom: 10px;
+    }
+    .pi-line2 strong { color: var(--cyan); }
+    .pi-line2 s { opacity: .4; }
+    .pi-cta {
+      background: linear-gradient(135deg, var(--purple), #6d28d9);
+      color: #fff; font-size: 12px; font-weight: 800;
+      padding: 8px 22px; border: none; border-radius: 20px;
+      cursor: pointer;
+      box-shadow: 0 2px 12px rgba(139,92,246,0.4);
+      transition: opacity .15s, transform .15s;
+    }
+    .pi-cta:hover { opacity:.9; transform:scale(1.05); }
+
+    @media (max-width: 720px) {
+      .hero-title { font-size: 34px; }
+      .feature-grid, .plans-grid { grid-template-columns: repeat(2,1fr); }
+      .plans-grid .free-tier { display: none; }
+      .quality-grid { grid-template-columns: 1fr; }
+      .plan-card.featured { transform: none; }
+      nav { padding: 0 16px; }
+      main { padding: 40px 16px 60px; }
+      .modal-box { padding: 32px 20px; }
+      /* Mobile: sidebar fica abaixo da fila principal */
+      #workspace.split { flex-direction: column; }
+      .conv-sidebar { width: 100%; max-width: 100%; position: static; max-height: 320px; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="drop-overlay"><div class="drop-msg">📂 Solte aqui</div></div>
+<div class="toasts" id="toasts"></div>
+
+<!-- ════════════════════════════════ NAV -->
+<nav>
+  <a class="logo" href="#" onclick="resetApp();return false;">
+    <div class="logo-icon">⚡</div>
+    <div class="logo-text">JPG<span>.convert</span></div>
+  </a>
+
+  <!-- Contador de conversões gratuitas -->
+  <div class="free-counter" id="freeCounter" title="Conversões gratuitas restantes hoje">
+    <div class="dots" id="counterDots"></div>
+    <div class="fc-info">
+      <span class="fc-label" id="counterLabel">5/5 hoje</span>
+      <span class="fc-reset" id="resetTimer"></span>
+    </div>
+  </div>
+
+  <div class="nav-right">
+    <button class="btn-ver-planos" onclick="openPlans()">
+      ✦ Ver Planos
+    </button>
+  </div>
+</nav>
+
+<!-- ════════════════════════════════ MAIN -->
+<main id="mainEl">
+
+  <input type="file" id="fileInput"    multiple accept="image/*,.heic,.heif,.svg,.tif,.tiff" style="display:none"/>
+  <input type="file" id="fileInputAdd" multiple accept="image/*,.heic,.heif,.svg,.tif,.tiff" style="display:none"/>
+
+  <!-- ─── TELA INICIAL ─── -->
+  <div id="uploadScreen">
+    <div class="hero-tag">Conversão 100% no navegador</div>
+    <h1 class="hero-title">Converta imagens<br>para JPG</h1>
+    <p class="hero-sub">Transforme qualquer imagem em JPG de alta qualidade,<br>sem upload para servidores. Zero privacidade comprometida.</p>
+
+    <div class="fmt-tags">
+      <span class="fmt-tag">PNG</span><span class="fmt-tag">GIF</span><span class="fmt-tag">WEBP</span>
+      <span class="fmt-tag">BMP</span><span class="fmt-tag">SVG</span><span class="fmt-tag">TIF</span>
+      <span class="fmt-tag">TIFF</span><span class="fmt-tag">HEIC</span><span class="fmt-tag">HEIF</span>
+    </div>
+
+    <!-- Banner promoção 1 — logo abaixo do título -->
+    <div class="promo-inline">
+      <p class="pi-line1">⚡ PROMOÇÃO SÓ HOJE — Plano Ilimitado com 50% OFF</p>
+      <p class="pi-line2">De <s>R$49,90</s> por apenas <strong>R$24,90/mês</strong></p>
+      <button class="pi-cta" onclick="openPlans()">Aproveitar agora →</button>
+    </div>
+
+    <label for="fileInput" class="drop-zone" id="dropZoneEl">
+      <span class="drop-zone-icon">🗂️</span>
+      <h2>Arraste suas imagens ou clique para selecionar</h2>
+      <p>Suporta PNG, GIF, WEBP, BMP, SVG, TIF e HEIC · Múltiplos arquivos</p>
+      <span class="btn-upload">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Selecionar imagens
+      </span>
+      <p class="drop-hint">ou arraste e solte aqui</p>
+    </label>
+
+    <div class="feature-grid">
+      <div class="feat"><div class="feat-icon purple">⚡</div><h4>Instantâneo</h4><p>Conversão direto no navegador, sem aguardar upload.</p></div>
+      <div class="feat"><div class="feat-icon cyan">🔒</div><h4>100% Privado</h4><p>Suas imagens nunca saem do dispositivo. Sem servidores.</p></div>
+      <div class="feat"><div class="feat-icon green">📦</div><h4>Download em ZIP</h4><p>Converta em lote e baixe todos os JPGs de uma vez.</p></div>
+    </div>
+  </div>
+
+  <!-- ─── WORKSPACE ─── -->
+  <div id="workspace">
+
+    <!-- Coluna principal -->
+    <div class="ws-main">
+
+      <!-- Banner de limite atingido -->
+      <div class="limit-banner" id="limitBanner">
+        <div class="limit-banner-icon">🔒</div>
+        <div class="limit-banner-text">
+          <strong>Você usou todas as suas conversões gratuitas de hoje</strong>
+          <p>Assine um plano para continuar convertendo sem limites.</p>
+        </div>
+        <button class="btn-upgrade-banner" onclick="openPlans()">Ver Planos →</button>
+      </div>
+
+      <div class="ws-bar">
+        <div class="ws-count">Na fila: <span id="wsCountBadge">0</span></div>
+        <label for="fileInputAdd" class="btn-add-more">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Adicionar mais
+        </label>
+      </div>
+
+      <div class="file-list" id="fileList"></div>
+
+      <div class="quality-panel" id="qualityPanel">
+        <p class="qp-title">Qualidade de saída</p>
+
+        <div class="qp-free-lock" id="qpFreeLock">
+          <div class="qp-lock-info">
+            <span class="qp-lock-icon">🔒</span>
+            <div>
+              <strong>Qualidade padrão (85%)</strong>
+              <span class="qp-lock-sub"> — personalização disponível nos planos pagos</span>
+            </div>
+          </div>
+          <button class="qp-upgrade-btn" onclick="openPlans()">Fazer upgrade →</button>
+        </div>
+
+        <div class="quality-grid" id="qualityGrid">
+          <div class="q-opt active" id="qRecommended" onclick="selectQ('recommended')">
+            <div class="q-opt-header"><div class="q-dot"></div><span class="q-label">Recomendada</span></div>
+            <div class="q-desc">85% — ótima qualidade com arquivo leve.</div>
+          </div>
+          <div class="q-opt" id="qHigh" onclick="selectQ('high')">
+            <div class="q-opt-header"><div class="q-dot"></div><span class="q-label">Alta Qualidade</span><span class="q-badge">MÁXIMO</span></div>
+            <div class="q-desc">Controle manual da qualidade.</div>
+            <div class="slider-wrap">
+              <div class="slider-label">Qualidade: <strong id="sliderVal">95%</strong></div>
+              <input type="range" id="qualitySlider" min="50" max="100" value="95" oninput="document.getElementById('sliderVal').textContent=this.value+'%'"/>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn-convert" id="btnConvert" onclick="startConversion()">Converter para JPG</button>
+      </div>
+
+    </div><!-- /ws-main -->
+
+    <!-- Sidebar de arquivos convertidos (aparece após 1ª conversão) -->
+    <div class="conv-sidebar" id="convSidebar">
+      <div class="sidebar-head">
+        <span>✓ Prontas <span id="sidebarCount" class="sidebar-count-badge">0</span></span>
+        <button class="sidebar-dl-all" onclick="downloadAllConverted()">↓ Baixar tudo</button>
+      </div>
+      <div class="sidebar-list" id="sidebarList"></div>
+    </div>
+
+  </div>
+
+  <!-- downloadSection mantido oculto (não usado no novo fluxo) -->
+  <div id="downloadSection" style="display:none">
+    <div id="convertedList"></div>
+  </div>
+
+</main>
+
+<!-- ════════════════════════════════ MODAL DE PLANOS -->
+<div class="modal-overlay" id="plansModal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closePlans()">✕</button>
+
+    <div class="modal-head">
+      <div class="modal-eyebrow" id="modalEyebrow">Limite diário atingido</div>
+      <h2>Escolha seu plano</h2>
+      <p>Desbloqueie conversões ilimitadas e recursos avançados</p>
+    </div>
+
+    <div class="plans-grid">
+
+      <!-- PLANO 0 — Grátis (referência) -->
+      <div class="plan-card free-tier">
+        <div class="plan-name" style="color:var(--muted2)">Grátis</div>
+        <div class="plan-price">
+          <span class="price-currency" style="color:var(--muted2)">R$</span>
+          <span class="price-number" style="color:var(--muted2)">0</span>
+        </div>
+        <div class="plan-period">para sempre</div>
+        <hr class="plan-divider"/>
+        <ul class="plan-features">
+          <li><span class="ico yes">✓</span><span><strong>5 conversões</strong>/dia</span></li>
+          <li><span class="ico yes">✓</span><span>Máx. <strong>10 fotos</strong> por vez</span></li>
+          <li><span class="ico yes">✓</span><span>Arquivos até <strong>5 MB</strong></span></li>
+          <li><span class="ico no">✕</span><span style="color:var(--muted)">Download em ZIP</span></li>
+          <li><span class="ico no">✕</span><span style="color:var(--muted)">Qualidade personalizada</span></li>
+          <li><span class="ico no">✕</span><span style="color:var(--muted)">Processamento prioritário</span></li>
+          <li><span class="ico no">✕</span><span style="color:var(--muted)">Histórico de conversões</span></li>
+          <li><span class="ico no">✕</span><span style="color:var(--muted)">Suporte via chat</span></li>
+        </ul>
+        <button class="btn-plan ghost" disabled style="opacity:.35;cursor:default">Plano atual</button>
+      </div>
+
+      <!-- PLANO 1 — Básico -->
+      <div class="plan-card">
+        <div class="plan-name">Básico</div>
+        <div class="plan-price">
+          <span class="price-currency">R$</span>
+          <span class="price-number">9</span>
+          <span class="price-cents">,90</span>
+        </div>
+        <div class="plan-period">por mês</div>
+        <hr class="plan-divider"/>
+        <ul class="plan-features">
+          <li><span class="ico yes">✓</span><span><strong>60 conversões</strong>/mês</span></li>
+          <li><span class="ico yes">✓</span><span>Até <strong>20 fotos</strong> por vez</span></li>
+          <li><span class="ico yes">✓</span><span>Arquivos até <strong>20 MB</strong></span></li>
+          <li><span class="ico yes">✓</span><span><strong>Download em ZIP</strong></span></li>
+          <li><span class="ico no">✕</span><span style="color:var(--muted)">Qualidade personalizada</span></li>
+          <li><span class="ico no">✕</span><span style="color:var(--muted)">Processamento prioritário</span></li>
+          <li><span class="ico no">✕</span><span style="color:var(--muted)">Histórico de conversões</span></li>
+          <li><span class="ico no">✕</span><span style="color:var(--muted)">Suporte via chat</span></li>
+        </ul>
+        <button class="btn-plan primary" onclick="selectPlan('basico')">Assinar Básico</button>
+      </div>
+
+      <!-- PLANO 2 — Pro (DESTAQUE) -->
+      <div class="plan-card featured">
+        <div class="plan-badge popular">⭐ MAIS POPULAR</div>
+        <div class="plan-name" style="color:var(--purple-lt)">Pro</div>
+        <div class="plan-price">
+          <span class="price-currency">R$</span>
+          <span class="price-number">19</span>
+          <span class="price-cents">,90</span>
+        </div>
+        <div class="plan-period">por mês</div>
+        <hr class="plan-divider"/>
+        <ul class="plan-features">
+          <li><span class="ico yes">✓</span><span><strong>300 conversões</strong>/mês</span></li>
+          <li><span class="ico yes">✓</span><span>Até <strong>30 fotos</strong> por vez</span></li>
+          <li><span class="ico yes">✓</span><span>Arquivos até <strong>100 MB</strong></span></li>
+          <li><span class="ico yes">✓</span><span><strong>Download em ZIP</strong></span></li>
+          <li><span class="ico yes">✓</span><span><strong>Qualidade personalizada</strong> (50–95%)</span></li>
+          <li><span class="ico yes">✓</span><span><strong>Processamento prioritário</strong></span></li>
+          <li><span class="ico no">✕</span><span style="color:var(--muted)">Histórico de conversões</span></li>
+          <li><span class="ico no">✕</span><span style="color:var(--muted)">Suporte via chat</span></li>
+        </ul>
+        <button class="btn-plan primary" onclick="selectPlan('pro')">Assinar Pro</button>
+      </div>
+
+      <!-- PLANO 3 — Ilimitado (MELHOR VALOR) -->
+      <div class="plan-card best-value">
+        <div class="plan-badge bestval">🔥 PROMOÇÃO SÓ HOJE</div>
+        <div class="plan-name" style="color:var(--cyan)">Ilimitado</div>
+        <div class="plan-old-price">De <s>R$49,90</s> → <strong>R$24,90</strong>/mês</div>
+        <div class="plan-price">
+          <span class="price-currency">R$</span>
+          <span class="price-number">24</span>
+          <span class="price-cents">,90</span>
+        </div>
+        <div class="plan-period">por mês · <span style="color:var(--cyan);font-weight:700">50% OFF</span></div>
+        <div class="plan-diff-tag">↑ Apenas R$5,00/mês a mais que o Pro</div>
+        <ul class="plan-features">
+          <li class="highlight"><span class="ico yes">✓</span><span>Conversões <strong>ILIMITADAS</strong> ♾️</span></li>
+          <li><span class="ico yes">✓</span><span>Até <strong>50 fotos</strong> por vez</span></li>
+          <li><span class="ico yes">✓</span><span><strong>Sem limite</strong> de tamanho de arquivo</span></li>
+          <li><span class="ico yes">✓</span><span><strong>Download em ZIP</strong></span></li>
+          <li><span class="ico yes">✓</span><span><strong>Qualidade máxima</strong> (100%)</span></li>
+          <li><span class="ico yes">✓</span><span><strong>Processamento prioritário</strong></span></li>
+          <li><span class="ico yes">✓</span><span><strong>Histórico de conversões</strong></span></li>
+          <li><span class="ico yes">✓</span><span><strong>Suporte prioritário</strong> 24/7</span></li>
+        </ul>
+        <button class="btn-plan top" onclick="selectPlan('ilimitado')">Quero Ilimitado →</button>
+      </div>
+
+    </div>
+
+    <!-- Barra de comparação Pro vs Ilimitado -->
+    <div class="plan-compare">
+      <div class="plan-compare-icon">💡</div>
+      <p>
+        Por apenas <strong>R$5,00 a mais</strong> que o plano Pro, o Ilimitado entrega
+        conversões <strong>sem restrição</strong>, 50 arquivos de uma vez, sem limite de tamanho e suporte prioritário.
+        A maioria dos nossos usuários escolhe o <strong>Ilimitado</strong>.
+      </p>
+    </div>
+
+    <div class="modal-footer-note">
+      <span>✓</span> Cancele quando quiser &nbsp;·&nbsp;
+      <span>✓</span> Sem fidelidade &nbsp;·&nbsp;
+      <span>✓</span> Pagamento 100% seguro
+    </div>
+  </div>
+</div>
+
+<!-- Banner promoção 2 — antes do footer -->
+<div style="display:flex;justify-content:center;padding:0 24px 32px;position:relative;z-index:1;">
+  <div class="promo-inline">
+    <p class="pi-line1">⚡ PROMOÇÃO SÓ HOJE — Plano Ilimitado com 50% OFF</p>
+    <p class="pi-line2">De <s>R$49,90</s> por apenas <strong>R$24,90/mês</strong></p>
+    <button class="pi-cta" onclick="openPlans()">Aproveitar agora →</button>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer id="footer">
+  <p>JPG.convert — Conversão local, sem servidores, sem coleta de dados.</p>
+  <div class="footer-formats">
+    <span class="footer-fmt">PNG</span><span class="footer-fmt">GIF</span>
+    <span class="footer-fmt">WEBP</span><span class="footer-fmt">BMP</span>
+    <span class="footer-fmt">SVG</span><span class="footer-fmt">TIF</span>
+    <span class="footer-fmt">HEIC</span>
+  </div>
+</footer>
+
+<!-- ════════════════════════════════ JS -->
+<script>
+/* ══════════════════════════════════ SISTEMA DE LIMITE */
+const FREE_LIMIT     = 5;  // conversões gratuitas por dia
+const FREE_MAX_FILES = 10; // fotos simultâneas no plano grátis
+
+/* Tripla persistência: localStorage → cookie → memória */
+let _usageCache = null;
+
+function _getCookie(name) {
+  try {
+    const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+    return m ? decodeURIComponent(m.pop()) : null;
+  } catch { return null; }
+}
+
+function _setCookieMidnight(name, value) {
+  try {
+    const exp = new Date(); exp.setHours(24, 0, 0, 0);
+    document.cookie = name + '=' + encodeURIComponent(value) +
+      ';expires=' + exp.toUTCString() + ';path=/;SameSite=Lax';
+  } catch {}
+}
+
+function getUsage() {
+  const t = today();
+  // 1. sessionStorage — sobrevive F5/refresh no mesmo tab
+  try {
+    const raw = sessionStorage.getItem('jpgconv_usage');
+    if (raw) { const d = JSON.parse(raw); if (d.date === t) { _usageCache = d; return d; } }
+  } catch {}
+  // 2. localStorage — sobrevive fechar/abrir o browser
+  try {
+    const raw = localStorage.getItem('jpgconv_usage');
+    if (raw) { const d = JSON.parse(raw); if (d.date === t) { _usageCache = d; return d; } }
+  } catch {}
+  // 3. cookie — fallback para ambientes sem localStorage
+  try {
+    const raw = _getCookie('jpgconv_usage');
+    if (raw) { const d = JSON.parse(raw); if (d.date === t) { _usageCache = d; return d; } }
+  } catch {}
+  // 4. memória (mesmo se tudo falhar, guarda na sessão atual)
+  if (_usageCache && _usageCache.date === t) return _usageCache;
+  const fresh = { count: 0, date: t };
+  _usageCache = fresh;
+  return fresh;
+}
+
+function saveUsage(u) {
+  _usageCache = u;
+  try { sessionStorage.setItem('jpgconv_usage', JSON.stringify(u)); } catch {}
+  try { localStorage.setItem('jpgconv_usage', JSON.stringify(u)); } catch {}
+  _setCookieMidnight('jpgconv_usage', JSON.stringify(u));
+}
+
+function getPlan() {
+  try { return localStorage.getItem('jpgconv_plan') || 'free'; } catch { return 'free'; }
+}
+
+function today() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function getRemainingConversions() {
+  if (getPlan() !== 'free') return Infinity;
+  const u = getUsage();
+  return Math.max(0, FREE_LIMIT - u.count);
+}
+
+function useConversion() {
+  if (getPlan() !== 'free') return;
+  const u = getUsage();
+  u.count += 1;
+  saveUsage(u);
+  updateCounter();
+}
+
+/* ══════════════════════════════════ CRONÔMETRO DE RESET */
+let _countdownIv = null;
+
+function getTimeUntilMidnight() {
+  const now = new Date();
+  const midnight = new Date(now);
+  midnight.setHours(24, 0, 0, 0);
+  const diff = midnight - now;
+  const h = Math.floor(diff / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  const s = Math.floor((diff % 60000) / 1000);
+  return `Reseta em ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function startCountdown() {
+  const el = document.getElementById('resetTimer');
+  if (!el) return;
+  if (_countdownIv) return; // já rodando
+  el.textContent = getTimeUntilMidnight();
+  _countdownIv = setInterval(() => {
+    el.textContent = getTimeUntilMidnight();
+  }, 1000);
+}
+
+function stopCountdown() {
+  if (_countdownIv) { clearInterval(_countdownIv); _countdownIv = null; }
+  const el = document.getElementById('resetTimer');
+  if (el) el.textContent = '';
+}
+
+function updateCounter() {
+  const plan = getPlan();
+  const counter = document.getElementById('freeCounter');
+  const label   = document.getElementById('counterLabel');
+  const dotsEl  = document.getElementById('counterDots');
+
+  if (plan !== 'free') {
+    counter.style.display = 'none';
+    stopCountdown();
+    return;
+  }
+
+  counter.style.display = '';
+
+  const rem  = getRemainingConversions();
+  const used = FREE_LIMIT - rem;
+
+  // Dots
+  dotsEl.innerHTML = '';
+  for (let i = 0; i < FREE_LIMIT; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot-item ' + (i < used ? 'used' : 'empty');
+    dotsEl.appendChild(d);
+  }
+
+  label.textContent = `${used}/${FREE_LIMIT} hoje`;
+  counter.classList.remove('warning', 'danger');
+  if (rem === 0) {
+    counter.classList.add('danger');
+    startCountdown();
+  } else {
+    stopCountdown();
+    if (rem <= 2) counter.classList.add('warning');
+  }
+}
+
+/* ══════════════════════════════════ ESTADO */
+let files          = [];
+let convertedFiles = []; // acumula todos os arquivos prontos na sidebar
+let qMode          = 'recommended';
+let converting     = false;
+
+/* Drag & Drop */
+let dc = 0;
+const ov = document.getElementById('drop-overlay');
+const dz = document.getElementById('dropZoneEl');
+
+document.addEventListener('dragenter', e => { e.preventDefault(); dc++; ov.classList.add('active'); });
+document.addEventListener('dragleave', () => { dc=Math.max(0,dc-1); if(!dc) ov.classList.remove('active'); });
+document.addEventListener('dragover',  e => e.preventDefault());
+document.addEventListener('drop', e => {
+  e.preventDefault(); dc=0; ov.classList.remove('active');
+  const ok = [...e.dataTransfer.files].filter(isOk);
+  ok.length ? addFiles(ok) : toast('Formato não suportado.','err');
+});
+dz.addEventListener('dragover',  () => dz.classList.add('drag-over'));
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop',      () => dz.classList.remove('drag-over'));
+
+/* File inputs */
+document.getElementById('fileInput').addEventListener('change', function(){
+  addFiles([...this.files]); this.value='';
+});
+document.getElementById('fileInputAdd').addEventListener('change', function(){
+  addFiles([...this.files]); this.value='';
+});
+
+/* ══════════════════════════════════ ARQUIVOS */
+const ACCEPTED_EXT  = ['png','gif','webp','bmp','svg','tif','tiff','heic','heif','jpg','jpeg'];
+const ACCEPTED_MIME = ['image/png','image/gif','image/webp','image/bmp','image/svg+xml','image/tiff','image/heic','image/heif','image/jpeg'];
+
+function isOk(f) {
+  const e = f.name.split('.').pop().toLowerCase();
+  return ACCEPTED_EXT.includes(e) || ACCEPTED_MIME.includes((f.type||'').toLowerCase());
+}
+
+function addFiles(list) {
+  if (converting) return;
+  let ok    = list.filter(isOk);
+  const bad = list.length - ok.length;
+  if (bad) toast(`${bad} arquivo(s) ignorado(s): formato inválido.`, 'err');
+  if (!ok.length) return;
+
+  // Limite de fotos simultâneas no plano grátis
+  if (getPlan() === 'free') {
+    const available = FREE_MAX_FILES - files.length;
+    if (available <= 0) {
+      toast(`Plano grátis: máx. ${FREE_MAX_FILES} fotos por sessão. Faça upgrade para adicionar mais!`, 'err');
+      openPlans();
+      return;
+    }
+    if (ok.length > available) {
+      toast(`Plano grátis: limite de ${FREE_MAX_FILES} fotos por sessão. Adicionando ${available} arquivo(s).`, 'info');
+      ok = ok.slice(0, available);
+    }
+  }
+
+  ok.forEach(f => {
+    files.push({
+      id:      uid(),
+      file:    f,
+      thumb:   canThumb(f) ? URL.createObjectURL(f) : null,
+      status:  'pending',
+      jpgBlob: null,
+      jpgName: f.name.replace(/\.[^/.]+$/, '') + '.jpg'
+    });
+  });
+  showWorkspace();
+  render();
+}
+
+function canThumb(f) {
+  const t = (f.type||'').toLowerCase();
+  return t.startsWith('image/') && !['image/tiff','image/heic','image/heif'].includes(t);
+}
+
+function showWorkspace() {
+  document.getElementById('uploadScreen').style.display    = 'none';
+  document.getElementById('workspace').style.display       = 'flex';
+  document.getElementById('downloadSection').style.display = 'none';
+  refreshLimitBanner();
+  applyQualityLock();
+}
+
+function applyQualityLock() {
+  const isFree = getPlan() === 'free';
+  document.getElementById('qpFreeLock').style.display  = isFree ? 'flex' : 'none';
+  document.getElementById('qualityGrid').style.display = isFree ? 'none' : 'grid';
+}
+
+function refreshLimitBanner() {
+  const banner = document.getElementById('limitBanner');
+  const rem = getRemainingConversions();
+  banner.classList.toggle('show', rem === 0);
+  const btn = document.getElementById('btnConvert');
+  if (btn) btn.disabled = converting || !files.length || rem === 0;
+}
+
+function render() {
+  const list = document.getElementById('fileList');
+  list.innerHTML = '';
+  files.forEach(e => {
+    const card = mk('div', 'file-card ' + e.status);
+    card.id = 'card-' + e.id;
+
+    const thumb = mk('div', 'file-thumb');
+    if (e.thumb) { const i = new Image(); i.src = e.thumb; thumb.appendChild(i); }
+    else thumb.textContent = icon(e.file);
+
+    const meta = mk('div', 'file-meta');
+    meta.innerHTML = `
+      <div class="file-name">${esc(e.file.name)}</div>
+      <div class="file-info">${fmtSize(e.file.size)} · ${ext(e.file.name).toUpperCase()}</div>
+      <div class="file-bar"><div class="file-bar-fill" id="bar-${e.id}"></div></div>`;
+
+    const badge = mk('div', 'file-badge ' + e.status);
+    badge.id = 'badge-' + e.id;
+    badge.textContent = badgeLabel(e.status);
+
+    const rm = mk('button', 'file-rm');
+    rm.innerHTML = '&times;'; rm.title = 'Remover';
+    rm.disabled = converting;
+    rm.onclick = () => removeFile(e.id);
+
+    card.append(thumb, meta, badge, rm);
+    list.appendChild(card);
+  });
+
+  document.getElementById('wsCountBadge').textContent = files.length;
+  refreshLimitBanner();
+}
+
+function removeFile(id) {
+  if (converting) return;
+  const i = files.findIndex(f => f.id === id);
+  if (i === -1) return;
+  if (files[i].thumb) URL.revokeObjectURL(files[i].thumb);
+  files.splice(i, 1);
+  if (files.length || convertedFiles.length) {
+    render(); // fica no workspace (fila vazia mas sidebar pode ter itens)
+  } else {
+    resetApp(); // tudo limpo → volta à tela inicial
+  }
+}
+
+function badgeLabel(s) {
+  return {pending:'aguardando', converting:'convertendo…', done:'✓ pronto', error:'✗ erro'}[s] || s;
+}
+
+/* Qualidade */
+function selectQ(m) {
+  qMode = m;
+  document.getElementById('qRecommended').classList.toggle('active', m === 'recommended');
+  document.getElementById('qHigh').classList.toggle('active', m === 'high');
+}
+function getQuality() {
+  if (getPlan() === 'free') return 0.85; // qualidade fixa para plano grátis
+  return qMode === 'recommended' ? 0.85 : parseInt(document.getElementById('qualitySlider').value) / 100;
+}
+
+/* ══════════════════════════════════ CONVERSÃO */
+async function startConversion() {
+  if (!files.filter(f => f.status !== 'done').length || converting) return;
+
+  if (getRemainingConversions() === 0) { openPlans(true); return; }
+
+  converting = true;
+  document.getElementById('btnConvert').disabled = true;
+
+  const q = getQuality();
+  let ok = 0;
+
+  for (const e of files) {
+    if (e.status === 'done') continue; // já convertido, pula
+    setStatus(e, 'converting');
+    animBar(e.id);
+    try {
+      e.jpgBlob = await convert(e.file, q);
+      e.status  = 'done';
+      setStatus(e, 'done');
+      setBar(e.id, 100);
+      ok++;
+    } catch (err) {
+      console.error(err);
+      e.status = 'error';
+      setStatus(e, 'error', err.message);
+      setBar(e.id, 0);
+      toast(`Erro em "${e.file.name}": ${err.message}`, 'err');
+    }
+  }
+
+  converting = false;
+
+  if (ok > 0) {
+    useConversion(); // 1 uso por lote, independente do nº de arquivos
+
+    // Mover arquivos prontos para a sidebar; remover da fila principal
+    const done = files.filter(f => f.status === 'done');
+    convertedFiles.push(...done);
+    files = files.filter(f => f.status !== 'done');
+
+    renderSidebar();
+    render();
+    refreshLimitBanner();
+    updateCounter();
+  }
+
+  document.getElementById('btnConvert').disabled = false;
+}
+
+function setStatus(e, status, errMsg) {
+  e.status = status;
+  const card  = document.getElementById('card-' + e.id);
+  const badge = document.getElementById('badge-' + e.id);
+  if (card)  card.className  = 'file-card '  + status;
+  if (badge) { badge.className = 'file-badge ' + status; badge.textContent = errMsg || badgeLabel(status); }
+}
+
+function setBar(id, pct) {
+  const el = document.getElementById('bar-' + id);
+  if (el) el.style.width = pct + '%';
+}
+
+function animBar(id) {
+  let p = 0;
+  const iv = setInterval(() => {
+    p = Math.min(p + Math.random() * 20 + 8, 88);
+    setBar(id, p);
+    if (p >= 88) clearInterval(iv);
+  }, 150);
+}
+
+/* Motores de conversão */
+async function convert(file, q) {
+  const e = ext(file.name);
+  const t = (file.type || '').toLowerCase();
+  if (t === 'image/heic' || t === 'image/heif' || e === 'heic' || e === 'heif') return convHEIC(file, q);
+  if (t === 'image/tiff' || e === 'tif' || e === 'tiff')                         return convTIFF(file, q);
+  if (t === 'image/svg+xml' || e === 'svg')                                       return convSVG(file, q);
+  return convCanvas(file, q);
+}
+
+function convCanvas(file, q) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = img.naturalWidth || 800; c.height = img.naturalHeight || 600;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+      c.toBlob(b => b ? res(b) : rej(new Error('Falha na conversão')), 'image/jpeg', q);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('Imagem inválida')); };
+    img.src = url;
+  });
+}
+
+function convSVG(file, q) {
+  return new Promise((res, rej) => {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const txt = ev.target.result;
+      const doc = new DOMParser().parseFromString(txt, 'image/svg+xml');
+      const s   = doc.querySelector('svg');
+      let w = parseFloat(s?.getAttribute('width')) || 0;
+      let h = parseFloat(s?.getAttribute('height')) || 0;
+      const vb = s?.getAttribute('viewBox');
+      if (vb) { const p = vb.trim().split(/[\s,]+/); w = w || +p[2]; h = h || +p[3]; }
+      if (!w || !h) { w = 800; h = 600; }
+      const blob = new Blob([txt], { type: 'image/svg+xml' });
+      const url  = URL.createObjectURL(blob);
+      const img  = new Image();
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        c.width = Math.round(Math.max(w, img.naturalWidth || w));
+        c.height= Math.round(Math.max(h, img.naturalHeight|| h));
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, c.width, c.height);
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        c.toBlob(b => b ? res(b) : rej(new Error('SVG falhou')), 'image/jpeg', q);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('SVG inválido')); };
+      img.src = url;
+    };
+    reader.onerror = () => rej(new Error('Falha ao ler SVG'));
+    reader.readAsText(file);
+  });
+}
+
+function convTIFF(file, q) {
+  return new Promise((res, rej) => {
+    if (typeof UTIF === 'undefined') return rej(new Error('Lib TIFF offline'));
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const buf  = ev.target.result;
+        const ifds = UTIF.decode(buf);
+        if (!ifds.length) throw new Error('TIFF sem páginas');
+        UTIF.decodeImage(buf, ifds[0]);
+        const rgba = UTIF.toRGBA8(ifds[0]);
+        const w = ifds[0].width, h = ifds[0].height;
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h);
+        const id = ctx.createImageData(w, h); id.data.set(rgba); ctx.putImageData(id, 0, 0);
+        c.toBlob(b => b ? res(b) : rej(new Error('TIFF falhou')), 'image/jpeg', q);
+      } catch (e) { rej(e); }
+    };
+    reader.onerror = () => rej(new Error('Falha ao ler TIFF'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+async function convHEIC(file, q) {
+  if (typeof heic2any === 'undefined') throw new Error('Lib HEIC offline');
+  const r = await heic2any({ blob: file, toType: 'image/jpeg', quality: q });
+  return Array.isArray(r) ? r[0] : r;
+}
+
+/* Sidebar de arquivos convertidos */
+function renderSidebar() {
+  const sidebar = document.getElementById('convSidebar');
+  const list    = document.getElementById('sidebarList');
+  const countEl = document.getElementById('sidebarCount');
+  const ws      = document.getElementById('workspace');
+
+  countEl.textContent = convertedFiles.length;
+  list.innerHTML = '';
+
+  convertedFiles.forEach(e => {
+    const item  = mk('div', 'sidebar-item');
+    const thumb = mk('div', 'sidebar-thumb');
+    const src   = e.thumb || (e.jpgBlob ? URL.createObjectURL(e.jpgBlob) : null);
+    if (src) { const img = new Image(); img.src = src; thumb.appendChild(img); }
+    else thumb.textContent = '🖼️';
+
+    const name = mk('span', 'sidebar-name');
+    name.textContent = e.jpgName;
+    name.title       = e.jpgName;
+
+    const dl = mk('button', 'sidebar-dl');
+    dl.textContent = '↓';
+    dl.title       = 'Baixar ' + e.jpgName;
+    dl.onclick = () => saveAs(e.jpgBlob, e.jpgName);
+
+    item.append(thumb, name, dl);
+    list.appendChild(item);
+  });
+
+  // Ativa layout split se há itens na sidebar
+  if (convertedFiles.length > 0) {
+    ws.classList.add('split');
+  } else {
+    ws.classList.remove('split');
+  }
+}
+
+async function downloadAllConverted() {
+  if (!convertedFiles.length) return;
+  if (convertedFiles.length === 1) { saveAs(convertedFiles[0].jpgBlob, convertedFiles[0].jpgName); return; }
+  toast('Gerando ZIP…', 'info');
+  const zip = new JSZip();
+  convertedFiles.forEach(e => zip.file(e.jpgName, e.jpgBlob));
+  const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+  saveAs(blob, 'imagens-convertidas.zip');
+}
+
+function resetApp() {
+  files.forEach(f => { if (f.thumb) URL.revokeObjectURL(f.thumb); });
+  files = []; convertedFiles = []; converting = false; qMode = 'recommended';
+  document.getElementById('uploadScreen').style.display = 'block';
+  document.getElementById('workspace').style.display    = 'none';
+  document.getElementById('workspace').classList.remove('split');
+  document.getElementById('fileList').innerHTML      = '';
+  document.getElementById('sidebarList').innerHTML   = '';
+  document.getElementById('sidebarCount').textContent = '0';
+  selectQ('recommended');
+  updateCounter();
+}
+
+/* ══════════════════════════════════ PLANOS */
+function openPlans(triggeredByLimit = false) {
+  const eyebrow = document.getElementById('modalEyebrow');
+  eyebrow.textContent = triggeredByLimit
+    ? 'Limite diário atingido'
+    : 'Desbloqueie o potencial total';
+  document.getElementById('plansModal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closePlans() {
+  document.getElementById('plansModal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// Fecha modal clicando fora
+document.getElementById('plansModal').addEventListener('click', function(e) {
+  if (e.target === this) closePlans();
+});
+
+function selectPlan(plan) {
+  closePlans();
+  window.location.href = 'checkout.html?plan=' + plan;
+}
+
+/* ══════════════════════════════════ HELPERS */
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+function mk(tag, cls) { const e = document.createElement(tag); if (cls) e.className = cls; return e; }
+function ext(name) { return name.split('.').pop().toLowerCase(); }
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtSize(b) {
+  if (b < 1024)    return b + 'B';
+  if (b < 1048576) return (b / 1024).toFixed(1) + 'KB';
+  return (b / 1048576).toFixed(1) + 'MB';
+}
+function icon(f) {
+  return {svg:'🎨',gif:'🎞️',tif:'🗂️',tiff:'🗂️',heic:'📷',heif:'📷'}[ext(f.name)] || '🖼️';
+}
+function toast(msg, type = '') {
+  const w = document.getElementById('toasts');
+  const t = mk('div', 'toast ' + type);
+  t.textContent = msg; w.appendChild(t);
+  setTimeout(() => t.remove(), 4500);
+}
+
+/* Init */
+updateCounter();
+
+/* Detecta retorno do checkout com plano ativado */
+(function () {
+  const p = new URLSearchParams(location.search).get('activated');
+  if (p && ['basico', 'pro', 'ilimitado'].includes(p)) {
+    history.replaceState(null, '', location.pathname); // limpa a URL
+    const names = { basico: 'Básico', pro: 'Pro', ilimitado: 'Ilimitado' };
+    setTimeout(() => toast(`✅ Plano ${names[p]} ativado! Aproveite sem limites.`, 'ok'), 400);
+  }
+})();
+</script>
+</body>
+</html>
