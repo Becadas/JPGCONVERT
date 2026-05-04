@@ -1123,7 +1123,24 @@
   </div>
 </div>
 
-<!-- FOOTER -->
+<!-- MODAL DE LOGIN -->
+<div class="login-overlay" id="loginModal">
+  <div class="login-box">
+    <button class="modal-close" onclick="closeLoginModal()" style="position:absolute;top:16px;right:16px">✕</button>
+    <h2>👤 Entrar</h2>
+    <p>Acesse sua conta para recuperar seu plano.</p>
+    <div class="login-field">
+      <label for="loginEmail">E-mail</label>
+      <input id="loginEmail" type="email" placeholder="seu@email.com" autocomplete="email"/>
+    </div>
+    <div class="login-field">
+      <label for="loginPassword">Senha</label>
+      <input id="loginPassword" type="password" placeholder="Sua senha" autocomplete="current-password"/>
+    </div>
+    <button class="btn-login-submit" onclick="doLogin()">Entrar</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div><!-- FOOTER -->
 <footer id="footer">
   <p>JPG.convert — Conversão local, sem servidores, sem coleta de dados.</p>
   <div class="footer-formats">
