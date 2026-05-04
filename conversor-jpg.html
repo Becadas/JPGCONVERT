@@ -1627,15 +1627,10 @@ document.getElementById('plansModal').addEventListener('click', function(e) {
   if (e.target === this) closePlans();
 });
 
-const KIWIFY_LINKS = {
-  basico:    'https://pay.kiwify.com.br/TqBgPL4',
-  pro:       'https://pay.kiwify.com.br/dmFRxnp',
-  ilimitado: 'https://pay.kiwify.com.br/7MZFUEj',
-};
 
 function selectPlan(plan) {
   closePlans();
-  window.open(KIWIFY_LINKS[plan], '_blank');
+  window.location.href = 'checkout.html?plan=' + plan;
 }
 
 /* ══════════════════════════════════ HELPERS */
