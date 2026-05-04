@@ -852,10 +852,18 @@
   </div>
 
   <div class="nav-right">
-    <button class="btn-ver-planos" onclick="openPlans()">
-      ✦ Ver Planos
-    </button>
+  <div class="user-chip" id="userChip">
+    <span class="user-chip-name" id="userChipName"></span>
+    <span class="user-chip-plan" id="userChipPlan"></span>
+    <button class="btn-logout" onclick="logout()" title="Sair">✕</button>
   </div>
+  <button class="btn-login" id="btnLogin" onclick="openLoginModal()">
+    👤 Entrar
+  </button>
+  <button class="btn-ver-planos" onclick="openPlans()">
+    ✦ Ver Planos
+  </button>
+</div>
 </nav>
 
 <!-- ════════════════════════════════ MAIN -->
