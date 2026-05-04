@@ -1113,8 +1113,32 @@ function showSuccess() {
   // localStorage.setItem('jpgconv_plan', planKey);
 }
 
-function goToConverter() {
-  localStorage.setItem('jpgconv_plan', planKey);
+async function goToConverter() {
+  try {
+    const name     = document.getElementById('fname').value.trim();
+    const email    = document.getElementById('femail').value.trim();
+    const password = document.getElementById('fpassword').value;
+
+    if (name && email && password) {
+      const res = await fetch('/api/register', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ name, email, password, plan: planKey }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        localStorage.setItem('jpgconv_session', JSON.stringify({
+          name:            data.name,
+          email:           data.email,
+          plan:            data.plan,
+          plan_expires_at: data.plan_expires_at,
+        }));
+        localStorage.setItem('jpgconv_plan', data.plan);
+      }
+    }
+  } catch (e) {
+    console.warn('[register]', e);
+  }
   window.location.href = 'conversor-jpg.html?activated=' + planKey;
 }
 
