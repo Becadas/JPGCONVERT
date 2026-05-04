@@ -1729,7 +1729,126 @@ function toast(msg, type = '') {
   setTimeout(() => t.remove(), 4500);
 }
 
+/* ══════════════════════════════════ SISTEMA DE LOGIN */
+function openLoginModal() {
+  document.getElementById('loginModal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => document.getElementById('loginEmail').focus(), 100);
+}
+
+function closeLoginModal() {
+  document.getElementById('loginModal').classList.remove('open');
+  document.body.style.overflow = '';
+  document.getElementById('loginError').style.display = 'none';
+}
+
+document.getElementById('loginPassword').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+async function doLogin() {
+  const email    = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl    = document.getElementById('loginError');
+  errEl.style.display = 'none';
+
+  if (!email || !password) {
+    errEl.textContent = 'Preencha e-mail e senha.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  try {
+    const res  = await fetch('/api/login', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      errEl.textContent = data.message || 'Erro ao entrar.';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    localStorage.setItem('jpgconv_session', JSON.stringify({
+      name:            data.name,
+      email:           data.email,
+      plan:            data.plan,
+      plan_expires_at: data.plan_expires_at,
+    }));
+    localStorage.setItem('jpgconv_plan', data.plan);
+
+    closeLoginModal();
+    applySession(data);
+    updateCounter();
+    applyQualityLock();
+
+    const planNames = { basico: 'Básico', pro: 'Pro', ilimitado: 'Ilimitado', free: 'Grátis' };
+    toast(`✅ Bem-vindo, ${data.name.split(' ')[0]}! Plano ${planNames[data.plan] || data.plan} ativo.`, 'ok');
+  } catch (e) {
+    errEl.textContent = 'Erro de conexão. Tente novamente.';
+    errEl.style.display = 'block';
+  }
+}
+
+function applySession(data) {
+  const chip     = document.getElementById('userChip');
+  const chipName = document.getElementById('userChipName');
+  const chipPlan = document.getElementById('userChipPlan');
+  const btnLogin = document.getElementById('btnLogin');
+  const planNames = { basico: 'Básico', pro: 'Pro', ilimitado: 'Ilimitado ♾️', free: 'Grátis' };
+
+  chipName.textContent = data.name.split(' ')[0];
+  chipPlan.textContent = planNames[data.plan] || data.plan;
+  chip.classList.add('visible');
+  btnLogin.style.display = 'none';
+
+  if (data.plan !== 'free' && data.plan !== 'ilimitado' && data.plan_expires_at) {
+    const exp  = new Date(data.plan_expires_at);
+    const diff = exp - new Date();
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    if (diff < 0) {
+      setTimeout(() => toast('⚠️ Seu plano expirou! Renove para continuar.', 'err'), 600);
+    } else if (days <= 2) {
+      setTimeout(() => toast(`⚠️ Seu plano expira em ${days} dia(s). Renove em breve!`, ''), 600);
+    }
+  }
+}
+
+function logout() {
+  localStorage.removeItem('jpgconv_session');
+  localStorage.setItem('jpgconv_plan', 'free');
+  document.getElementById('userChip').classList.remove('visible');
+  document.getElementById('btnLogin').style.display = '';
+  updateCounter();
+  applyQualityLock();
+  toast('Você saiu da conta.', 'info');
+}
+
+function loadSession() {
+  try {
+    const raw = localStorage.getItem('jpgconv_session');
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (!data.email) return;
+
+    if (data.plan !== 'free' && data.plan !== 'ilimitado' && data.plan_expires_at) {
+      if (new Date(data.plan_expires_at) < new Date()) {
+        data.plan = 'free';
+        localStorage.setItem('jpgconv_plan', 'free');
+        localStorage.setItem('jpgconv_session', JSON.stringify({ ...data, plan: 'free' }));
+      }
+    }
+
+    localStorage.setItem('jpgconv_plan', data.plan);
+    applySession(data);
+  } catch {}
+}
+
 /* Init */
+loadSession();
 updateCounter();
 
 /* Detecta retorno do checkout com plano ativado */
