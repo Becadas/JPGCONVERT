@@ -421,11 +421,16 @@
               <input id="fcpf" name="cpf" type="text" placeholder="000.000.000-00" maxlength="14" inputmode="numeric"/>
               <span class="field-error">CPF inválido.</span>
             </div>
-            <div class="field" id="field-phone">
-              <label for="fphone">Celular <span style="color:var(--muted);font-weight:400">(opcional)</span></label>
-              <input id="fphone" name="phone" type="tel" placeholder="(11) 99999-0000" maxlength="15" inputmode="numeric" autocomplete="tel"/>
-            </div>
-          </div>
+            <div class="field" id="field-password">
+  <label for="fpassword">Crie uma senha</label>
+  <input id="fpassword" name="password" type="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password"/>
+  <span class="field-error">Senha deve ter no mínimo 6 caracteres.</span>
+</div>
+<div class="field" id="field-password2">
+  <label for="fpassword2">Confirme a senha</label>
+  <input id="fpassword2" name="password2" type="password" placeholder="Repita a senha" autocomplete="new-password"/>
+  <span class="field-error">As senhas não coincidem.</span>
+</div>
         </form>
       </div>
 
